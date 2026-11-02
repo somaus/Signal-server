@@ -2,6 +2,8 @@ package com.signal.domain.monitoring.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -25,24 +27,34 @@ public class Detection {
     @Column(nullable = false)
     private Long monitoringId;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 2048)
     private String sourceUrl;
 
-    @Column(nullable = false)
+    @Column(length = 2048)
     private String thumbnailUrl;
 
-    @Column(nullable = false)
-    private double similarity;
+    @Column(length = 500)
+    private String title;
+
+    /** 스텁의 시연용 값. 실제 검색 결과에는 점수가 없어 null이고 {@link #matchType}을 쓴다. */
+    private Double similarity;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private MatchType matchType;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime detectedAt;
 
     @Builder
-    public Detection(Long monitoringId, String sourceUrl, String thumbnailUrl, double similarity) {
+    public Detection(Long monitoringId, String sourceUrl, String thumbnailUrl, String title, Double similarity,
+                     MatchType matchType) {
         this.monitoringId = monitoringId;
         this.sourceUrl = sourceUrl;
         this.thumbnailUrl = thumbnailUrl;
+        this.title = title;
         this.similarity = similarity;
+        this.matchType = matchType;
         this.detectedAt = LocalDateTime.now();
     }
 }

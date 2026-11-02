@@ -18,4 +18,9 @@ public interface FileStorage {
      * 저장된 파일을 URL로 읽어온다.
      */
     byte[] load(String url);
+
+    /**
+     * 저장된 파일을 삭제한다. 이미 없으면 아무 일도 하지 않는다.
+     */
+    void delete(String url);
 }

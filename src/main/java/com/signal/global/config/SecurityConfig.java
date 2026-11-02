@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/risk-assessments/**").permitAll()
                         .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/api/v1/web-search/temp-images/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 // 기본값은 미인증 요청에도 403을 빈 본문으로 반환한다. 401/403을 구분해

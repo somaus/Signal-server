@@ -6,6 +6,7 @@ import com.signal.domain.user.repository.UserRepository;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.file.FileStorage;
+import com.signal.domain.websearch.service.WebSearchService;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -23,6 +24,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final FileStorage fileStorage;
+    private final WebSearchService webSearchService;
 
     public User getMyProfile(Long userId) {
         return userRepository.findById(userId)
@@ -43,6 +45,7 @@ public class UserService {
         if (!userRepository.existsById(userId)) {
             throw new SignalException(ErrorCode.NOT_FOUND);
         }
+        webSearchService.deleteByOwner(userId);
         userRepository.deleteById(userId);
     }
 

@@ -13,6 +13,7 @@ import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.file.FileStorage;
 import java.util.Optional;
+import com.signal.domain.websearch.service.WebSearchService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -29,11 +30,14 @@ class UserServiceTest {
     @Mock
     private FileStorage fileStorage;
 
+    @Mock
+    private WebSearchService webSearchService;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, fileStorage);
+        userService = new UserService(userRepository, fileStorage, webSearchService);
     }
 
     @Test

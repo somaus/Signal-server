@@ -1,5 +1,6 @@
 package com.signal.domain.deepfakedetection.dto.response;
 
+import com.signal.domain.websearch.entity.WebSearch;
 import com.signal.domain.deepfakedetection.entity.DeepfakeDetection;
 import com.signal.domain.deepfakedetection.entity.DeepfakeDetectionStatus;
 import com.signal.domain.deepfakedetection.entity.DetectionFailureReason;
@@ -30,10 +31,16 @@ public record DeepfakeDetectionResponse(
         String undeterminedReason,
         String modelName,
         String modelVersion,
-        List<ProvenanceSignalResponse> provenanceSignals
+        List<ProvenanceSignalResponse> provenanceSignals,
+        WebSearchResponse webSearch
 ) {
 
     public static DeepfakeDetectionResponse from(DeepfakeDetection detection) {
+        return from(detection, null);
+    }
+
+    /** webSearch가 null이면 웹 검색 기능이 꺼져 있거나 이 탐지에는 검색이 없다(화면은 "준비 중"으로 둔다). */
+    public static DeepfakeDetectionResponse from(DeepfakeDetection detection, WebSearch webSearch) {
         List<String> codes = detection.getProvenanceSignals() == null ? List.of() : detection.getProvenanceSignals();
         return new DeepfakeDetectionResponse(
                 detection.getId(),
@@ -54,6 +61,7 @@ public record DeepfakeDetectionResponse(
                         .map(ProvenanceSignal::fromCode)
                         .flatMap(java.util.Optional::stream)
                         .map(ProvenanceSignalResponse::from)
-                        .toList());
+                        .toList(),
+                webSearch == null ? null : WebSearchResponse.from(webSearch));
     }
 }

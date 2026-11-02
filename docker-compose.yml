@@ -34,6 +34,11 @@ services:
       PROTECTION_API_URL: http://protection:8000
       DEEPFAKE_DETECTION_MODE: ${DEEPFAKE_DETECTION_MODE:-llm}   # http로 바꾸면 detect 서비스(전용 탐지 모델)를 호출
       DEEPFAKE_DETECTION_API_URL: http://detect:8000
+      MONITORING_MODE: ${MONITORING_MODE:-stub}   # search로 바꾸면 웹 역이미지 검색(GOOGLE_VISION_API_KEY 필요, 얼굴 사진이 Google로 전송됨)
+      GOOGLE_VISION_API_KEY: ${GOOGLE_VISION_API_KEY:-}
+      WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-none}   # serpapi로 바꾸면 탐지한 사진을 웹에서 역검색(SERPAPI_API_KEY, WEB_SEARCH_PUBLIC_BASE_URL 필요, 얼굴 사진이 외부로 전송됨)
+      SERPAPI_API_KEY: ${SERPAPI_API_KEY:-}
+      WEB_SEARCH_PUBLIC_BASE_URL: ${WEB_SEARCH_PUBLIC_BASE_URL:-}
     volumes:
       - uploads-data:/app/uploads
 

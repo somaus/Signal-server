@@ -5,6 +5,7 @@ import com.signal.domain.monitoring.repository.DetectionRepository;
 import com.signal.domain.monitoring.repository.MonitoringRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
@@ -18,6 +19,7 @@ import org.springframework.stereotype.Component;
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "monitoring.mode", havingValue = "stub", matchIfMissing = true)
 public class StubFaceMonitor implements FaceMonitor {
 
     private static final int MAX_INITIAL_DETECTIONS = 3;

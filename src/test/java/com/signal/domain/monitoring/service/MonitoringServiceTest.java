@@ -131,6 +131,26 @@ class MonitoringServiceTest {
     }
 
     @Test
+    void 삭제하면_기준_이미지_파일도_지운다() {
+        Monitoring monitoring = Monitoring.builder().userId(1L).referenceImageUrl("/uploads/monitorings/a.png").build();
+        when(monitoringRepository.findById(1L)).thenReturn(Optional.of(monitoring));
+
+        monitoringService.deleteMonitoring(1L, 1L);
+
+        verify(fileStorage).delete("/uploads/monitorings/a.png");
+    }
+
+    @Test
+    void 사용자당_모니터링_수를_넘으면_예외가_발생한다() {
+        when(monitoringRepository.countByUserId(1L)).thenReturn(3L);
+        MockMultipartFile file = new MockMultipartFile("referenceImage", "a.png", "image/png", new byte[]{1});
+
+        assertThatThrownBy(() -> monitoringService.createMonitoring(1L, file))
+                .isInstanceOf(SignalException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.MONITORING_LIMIT_EXCEEDED);
+    }
+
+    @Test
     void 존재하지_않는_모니터링을_삭제하면_예외가_발생한다() {
         when(monitoringRepository.findById(1L)).thenReturn(Optional.empty());
 

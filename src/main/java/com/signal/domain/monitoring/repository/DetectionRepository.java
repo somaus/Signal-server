@@ -9,5 +9,7 @@ public interface DetectionRepository extends JpaRepository<Detection, Long> {
 
     Page<Detection> findByMonitoringIdOrderByDetectedAtDesc(Long monitoringId, Pageable pageable);
 
+    boolean existsByMonitoringIdAndSourceUrl(Long monitoringId, String sourceUrl);
+
     void deleteAllByMonitoringId(Long monitoringId);
 }

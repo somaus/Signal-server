@@ -87,6 +87,22 @@ public class LocalFileStorage implements FileStorage {
         }
     }
 
+    @Override
+    public void delete(String url) {
+        String relativePath = url.startsWith(baseUrl + "/") ? url.substring(baseUrl.length() + 1) : url;
+        Path target = rootDir.resolve(relativePath).normalize();
+        if (!target.startsWith(rootDir)) {
+            log.error("업로드 디렉토리 밖의 파일 삭제 시도: {}", url);
+            return;
+        }
+
+        try {
+            Files.deleteIfExists(target);
+        } catch (IOException e) {
+            log.warn("파일 삭제 실패: {}", target, e);
+        }
+    }
+
     private Path resolveTarget(String directory, String filename) {
         Path target = rootDir.resolve(directory).normalize().resolve(filename).normalize();
         if (!target.startsWith(rootDir)) {

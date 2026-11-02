@@ -26,6 +26,7 @@ public class MonitoringService {
     private static final long MAX_IMAGE_SIZE = 10L * 1024 * 1024;
     private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of("image/jpeg", "image/png");
     private static final String REFERENCE_IMAGE_DIRECTORY = "monitorings";
+    private static final int MAX_MONITORINGS_PER_USER = 3;
 
     private final MonitoringRepository monitoringRepository;
     private final DetectionRepository detectionRepository;
@@ -35,6 +36,9 @@ public class MonitoringService {
     @Transactional
     public Monitoring createMonitoring(Long userId, MultipartFile referenceImage) {
         UploadFileValidator.validate(referenceImage, MAX_IMAGE_SIZE, ALLOWED_CONTENT_TYPES);
+        if (monitoringRepository.countByUserId(userId) >= MAX_MONITORINGS_PER_USER) {
+            throw new SignalException(ErrorCode.MONITORING_LIMIT_EXCEEDED);
+        }
 
         String referenceImageUrl = fileStorage.store(referenceImage, REFERENCE_IMAGE_DIRECTORY);
 
@@ -49,6 +53,10 @@ public class MonitoringService {
         return saved;
     }
 
+    public Monitoring getMyMonitoring(Long userId, Long monitoringId) {
+        return getMonitoring(userId, monitoringId);
+    }
+
     public Page<Detection> getDetections(Long userId, Long monitoringId, Pageable pageable) {
         getMonitoring(userId, monitoringId);
         return detectionRepository.findByMonitoringIdOrderByDetectedAtDesc(monitoringId, pageable);
@@ -59,6 +67,8 @@ public class MonitoringService {
         Monitoring monitoring = getMonitoring(userId, monitoringId);
         detectionRepository.deleteAllByMonitoringId(monitoringId);
         monitoringRepository.delete(monitoring);
+        // 얼굴 사진이므로 모니터링을 지우면 기준 이미지 파일도 함께 지운다.
+        TransactionUtils.runAfterCommit(() -> fileStorage.delete(monitoring.getReferenceImageUrl()));
     }
 
     private Monitoring getMonitoring(Long userId, Long monitoringId) {

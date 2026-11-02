@@ -68,7 +68,29 @@ protection:
     timeout-seconds: ${PROTECTION_API_TIMEOUT_SECONDS:300}   # 노이즈 계산은 CPU에서 수 분까지 걸릴 수 있음
 
 monitoring:
-  processing-delay-ms: 3000   # 얼굴 모니터링 초기 탐지 시뮬레이션 지연 (스텁, 추후 AI 서버 연동 시 제거)
+  mode: ${MONITORING_MODE:stub}   # stub: 시연용 예시 결과(StubFaceMonitor, 기본) / search: 웹 역이미지 검색을 하루 1회 수행(SearchFaceMonitor)
+  processing-delay-ms: 3000   # stub 모드의 탐지 시뮬레이션 지연
+  search:   # mode=search
+    interval-hours: ${MONITORING_SEARCH_INTERVAL_HOURS:24}   # 모니터링 하나를 다시 검색하는 간격
+    daily-limit: ${MONITORING_SEARCH_DAILY_LIMIT:30}         # 하루 전체 검색 상한. Vision 무료 쿼터(월 1,000건)를 넘지 않도록 30건 안팎
+    max-failures: ${MONITORING_SEARCH_MAX_FAILURES:5}        # 연속 실패가 이 횟수에 이르면 PAUSED
+    timeout-seconds: ${MONITORING_SEARCH_TIMEOUT_SECONDS:30}
+    cron: ${MONITORING_SEARCH_CRON:0 0 * * * *}              # 검색 시각이 지난 모니터링을 찾는 주기(매시 정각)
+    google-vision:
+      api-key: ${GOOGLE_VISION_API_KEY:}                     # mode=search일 때 필수
+
+web-search:   # 탐지한 사진이 웹 어딘가에 올라와 있는지 역이미지 검색(탐지 결과의 "얼굴 도용 여부" 카드)
+  provider: ${WEB_SEARCH_PROVIDER:none}   # none: 끔(기본, webSearch=null) / serpapi: SerpApi Google Lens. 켜면 얼굴 사진이 외부로 전송된다
+  # SerpApi 무료 플랜은 월 250건이다. 사용자별 하루 → 전체 하루 → 전체 한 달 순서로 막아 한도를 넘지 않게 한다.
+  owner-daily-limit: ${WEB_SEARCH_OWNER_DAILY_LIMIT:2}   # 사용자(비로그인은 익명 id)당 하루 검색 상한
+  daily-limit: ${WEB_SEARCH_DAILY_LIMIT:8}               # 하루 전체 검색 상한(250/30일)
+  monthly-limit: ${WEB_SEARCH_MONTHLY_LIMIT:240}         # 이번 달 전체 상한. 250에서 여유 10건을 남긴다
+  public-base-url: ${WEB_SEARCH_PUBLIC_BASE_URL:}   # SerpApi가 임시 이미지를 가져갈 이 서버의 외부 주소(https://...)
+  temp-image-ttl-seconds: 90   # 검색 타임아웃(60초)보다 조금만 길게
+  retention-days: ${WEB_SEARCH_RETENTION_DAYS:30}   # 검색 결과 보존 기간. 지나면 삭제한다
+  timeout-seconds: ${WEB_SEARCH_TIMEOUT_SECONDS:60}
+  serpapi:
+    api-key: ${SERPAPI_API_KEY:}
 
 deepfake-detection:
   mode: ${DEEPFAKE_DETECTION_MODE:llm}   # llm: 비전 LLM(LlmDeepfakeDetector, 기본) / http: detect-lab 서비스의 전용 탐지 모델 호출(HttpDeepfakeDetector)
