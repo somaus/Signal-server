@@ -34,13 +34,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (token != null && jwtProvider.validateToken(token) && !jwtProvider.isRefreshToken(token)) {
             Long userId = jwtProvider.getUserId(token);
 
-            // 탈퇴한 사용자의 액세스 토큰은 만료 전까지 서명이 유효하다. 존재 여부를 여기서 한 번
-            // 확인해두면 각 서비스가 없는 userId로 데이터를 쌓는 일을 막을 수 있다.
-            if (userRepository.existsById(userId)) {
-                var authentication = new UsernamePasswordAuthenticationToken(
-                        userId, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
-                SecurityContextHolder.getContext().setAuthentication(authentication);
-            }
+            // 탈퇴한 사용자의 토큰이나, 로그아웃·비밀번호 재설정으로 tokenVersion이 올라간 뒤의 옛 액세스 토큰은
+            // 만료 전까지 서명이 유효하다. 사용자 존재와 tokenVersion을 함께 확인해 이런 토큰을 거른다.
+            userRepository.findById(userId)
+                    .filter(user -> user.getTokenVersion() == jwtProvider.getTokenVersion(token))
+                    .ifPresent(user -> {
+                        var authentication = new UsernamePasswordAuthenticationToken(
+                                userId, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                    });
         }
 
         filterChain.doFilter(request, response);

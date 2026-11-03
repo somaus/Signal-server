@@ -6,7 +6,9 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.signal.domain.user.entity.User;
 import com.signal.domain.user.repository.UserRepository;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,7 +59,8 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
         when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
-        when(userRepository.existsById(1L)).thenReturn(true);
+        when(jwtProvider.getTokenVersion(TOKEN)).thenReturn(0);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user()));
 
         Authentication authentication = doFilterWithBearer(TOKEN);
 
@@ -65,12 +68,29 @@ class JwtAuthenticationFilterTest {
         assertThat(authentication.getPrincipal()).isEqualTo(1L);
     }
 
+    private static User user() {
+        return User.builder().email("a@x.com").password("p").name("n").build();   // tokenVersion 0
+    }
+
+    @Test
+    void 로그아웃으로_tokenVersion이_올라간_뒤의_옛_액세스_토큰으로는_인증하지_않는다() throws Exception {
+        User loggedOut = user();
+        loggedOut.invalidateTokens();
+        when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
+        when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
+        when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
+        when(jwtProvider.getTokenVersion(TOKEN)).thenReturn(0);
+        when(userRepository.findById(1L)).thenReturn(Optional.of(loggedOut));
+
+        assertThat(doFilterWithBearer(TOKEN)).isNull();
+    }
+
     @Test
     void 탈퇴한_사용자의_토큰이면_인증하지_않는다() throws Exception {
         when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
         when(jwtProvider.getUserId(TOKEN)).thenReturn(99L);
-        when(userRepository.existsById(99L)).thenReturn(false);
+        when(userRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThat(doFilterWithBearer(TOKEN)).isNull();
     }
@@ -81,7 +101,7 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(true);
 
         assertThat(doFilterWithBearer(TOKEN)).isNull();
-        verify(userRepository, never()).existsById(anyLong());
+        verify(userRepository, never()).findById(anyLong());
     }
 
     @Test
