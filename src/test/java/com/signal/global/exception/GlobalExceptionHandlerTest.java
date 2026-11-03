@@ -7,6 +7,7 @@ import com.signal.domain.agency.entity.AgencySituationType;
 import com.signal.global.response.ErrorResponse;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
@@ -40,6 +41,15 @@ class GlobalExceptionHandlerTest {
 
         ResponseEntity<ErrorResponse> response =
                 globalExceptionHandler.handleMethodArgumentTypeMismatchException(exception);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().code()).isEqualTo(ErrorCode.INVALID_INPUT.name());
+    }
+
+    @Test
+    void 필수_파일_파트가_없으면_500이_아니라_400_INVALID_INPUT을_반환한다() {
+        ResponseEntity<ErrorResponse> response =
+                globalExceptionHandler.handleMissingRequestValue(new MissingServletRequestPartException("file"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().code()).isEqualTo(ErrorCode.INVALID_INPUT.name());
