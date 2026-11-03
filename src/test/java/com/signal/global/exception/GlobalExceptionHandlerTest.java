@@ -7,6 +7,7 @@ import com.signal.domain.agency.entity.AgencySituationType;
 import com.signal.global.response.ErrorResponse;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpInputMessage;
@@ -53,5 +54,14 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().code()).isEqualTo(ErrorCode.INVALID_INPUT.name());
+    }
+
+    @Test
+    void 지원하지_않는_HTTP_메서드는_500이_아니라_405를_반환한다() {
+        ResponseEntity<ErrorResponse> response =
+                globalExceptionHandler.handleMethodNotSupported(new HttpRequestMethodNotSupportedException("DELETE"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(response.getBody().code()).isEqualTo(ErrorCode.METHOD_NOT_ALLOWED.name());
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MissingRequestHeaderException;
@@ -65,6 +66,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(ErrorResponse.of(400, ErrorCode.INVALID_INPUT.name(), ErrorCode.INVALID_INPUT.getMessage()));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        ErrorCode errorCode = ErrorCode.METHOD_NOT_ALLOWED;
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ErrorResponse.of(errorCode.getStatus().value(), errorCode.name(), errorCode.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)
