@@ -62,10 +62,11 @@ class GlobalExceptionHandlerTest {
     @Test
     void 지원하지_않는_HTTP_메서드는_500이_아니라_405를_반환한다() {
         ResponseEntity<ErrorResponse> response =
-                globalExceptionHandler.handleMethodNotSupported(new HttpRequestMethodNotSupportedException("DELETE"));
+                globalExceptionHandler.handleMethodNotSupported(new HttpRequestMethodNotSupportedException("DELETE", java.util.List.of("GET", "POST")));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
         assertThat(response.getBody().code()).isEqualTo(ErrorCode.METHOD_NOT_ALLOWED.name());
+        assertThat(response.getHeaders().getAllow()).contains(org.springframework.http.HttpMethod.GET);
     }
 
     @Test
@@ -83,6 +84,6 @@ class GlobalExceptionHandlerTest {
                 new HttpMediaTypeNotSupportedException("text/plain"));
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
-        assertThat(response.getBody().code()).isEqualTo(ErrorCode.UNSUPPORTED_MEDIA_TYPE.name());
+        assertThat(response.getBody().code()).isEqualTo(ErrorCode.UNSUPPORTED_CONTENT_TYPE.name());
     }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+import com.signal.domain.auth.dto.request.ResetPasswordRequest;
 import com.signal.domain.auth.dto.response.TokenResponse;
 import com.signal.domain.user.entity.User;
 import com.signal.domain.user.repository.UserRepository;
@@ -121,7 +122,7 @@ class AuthServiceTest {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
         String oldRefreshToken = jwtProvider.createRefreshToken(USER_ID, user.getTokenVersion());
 
-        authService.resetPassword(new com.signal.domain.auth.dto.request.ResetPasswordRequest(
+        authService.resetPassword(new ResetPasswordRequest(
                 "user@example.com", "vrf_token", "newpassword1", "newpassword1"));
 
         assertInvalidRefreshToken(oldRefreshToken);

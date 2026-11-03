@@ -1,7 +1,9 @@
 package com.signal.global.exception;
 
 import com.signal.global.response.ErrorResponse;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -73,8 +75,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
         ErrorCode errorCode = ErrorCode.METHOD_NOT_ALLOWED;
-        return ResponseEntity
-                .status(errorCode.getStatus())
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(errorCode.getStatus());
+        Set<HttpMethod> supported = e.getSupportedHttpMethods();
+        if (supported != null && !supported.isEmpty()) {
+            builder.allow(supported.toArray(new HttpMethod[0]));   // RFC 9110: 405에는 허용 메서드를 알린다
+        }
+        return builder
                 .body(ErrorResponse.of(errorCode.getStatus().value(), errorCode.name(), errorCode.getMessage()));
     }
 
@@ -88,7 +94,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
     public ResponseEntity<ErrorResponse> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {
-        ErrorCode errorCode = ErrorCode.UNSUPPORTED_MEDIA_TYPE;
+        ErrorCode errorCode = ErrorCode.UNSUPPORTED_CONTENT_TYPE;   // 파일 형식이 아니라 요청 본문 형식 문제
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode.getStatus().value(), errorCode.name(), errorCode.getMessage()));
