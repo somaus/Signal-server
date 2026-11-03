@@ -36,9 +36,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             // 탈퇴한 사용자의 토큰이나, 로그아웃·비밀번호 재설정으로 tokenVersion이 올라간 뒤의 옛 액세스 토큰은
             // 만료 전까지 서명이 유효하다. 사용자 존재와 tokenVersion을 함께 확인해 이런 토큰을 거른다.
-            userRepository.findById(userId)
-                    .filter(user -> user.getTokenVersion() == jwtProvider.getTokenVersion(token))
-                    .ifPresent(user -> {
+            userRepository.findTokenVersionById(userId)
+                    .filter(version -> version == jwtProvider.getTokenVersion(token))
+                    .ifPresent(version -> {
                         var authentication = new UsernamePasswordAuthenticationToken(
                                 userId, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
                         SecurityContextHolder.getContext().setAuthentication(authentication);
