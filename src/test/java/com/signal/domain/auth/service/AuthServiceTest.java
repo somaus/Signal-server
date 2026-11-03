@@ -114,4 +114,16 @@ class AuthServiceTest {
                 .isInstanceOfSatisfying(SignalException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND));
     }
+
+    @Test
+    void 비밀번호를_재설정하면_이전_리프레시_토큰으로_재발급할_수_없다() {
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        String oldRefreshToken = jwtProvider.createRefreshToken(USER_ID, user.getTokenVersion());
+
+        authService.resetPassword(new com.signal.domain.auth.dto.request.ResetPasswordRequest(
+                "user@example.com", "vrf_token", "newpassword1", "newpassword1"));
+
+        assertInvalidRefreshToken(oldRefreshToken);
+    }
 }

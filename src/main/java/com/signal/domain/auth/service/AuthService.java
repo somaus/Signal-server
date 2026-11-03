@@ -74,6 +74,8 @@ public class AuthService {
                 .orElseThrow(() -> new SignalException(ErrorCode.NOT_FOUND));
 
         user.updatePassword(passwordEncoder.encode(request.newPassword()));
+        // 비밀번호를 바꾼 뒤에는 이전에 발급된 리프레시 토큰으로 재발급할 수 없어야 한다(탈취 대응).
+        user.invalidateTokens();
     }
 
     public TokenResponse reissue(String refreshToken) {
