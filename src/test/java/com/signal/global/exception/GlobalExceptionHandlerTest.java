@@ -7,6 +7,7 @@ import com.signal.domain.agency.entity.AgencySituationType;
 import com.signal.global.response.ErrorResponse;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.http.HttpMethod;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
@@ -74,5 +75,14 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(response.getBody().code()).isEqualTo(ErrorCode.NOT_FOUND.name());
+    }
+
+    @Test
+    void 지원하지_않는_Content_Type은_500이_아니라_415를_반환한다() {
+        ResponseEntity<ErrorResponse> response = globalExceptionHandler.handleMediaTypeNotSupported(
+                new HttpMediaTypeNotSupportedException("text/plain"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        assertThat(response.getBody().code()).isEqualTo(ErrorCode.UNSUPPORTED_MEDIA_TYPE.name());
     }
 }
