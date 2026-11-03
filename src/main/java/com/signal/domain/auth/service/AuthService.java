@@ -10,6 +10,7 @@ import com.signal.domain.user.repository.UserRepository;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.security.jwt.JwtProvider;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -30,7 +31,7 @@ public class AuthService {
     private long accessTokenExpiration;
 
     public TokenResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.email())
+        User user = userRepository.findByEmail(normalize(request.email()))
                 .orElseThrow(() -> new SignalException(ErrorCode.LOGIN_FAILED));
 
         if (!passwordEncoder.matches(request.password(), user.getPassword())) {
@@ -45,14 +46,15 @@ public class AuthService {
         if (!request.agreements().allAgreed()) {
             throw new SignalException(ErrorCode.AGREEMENT_REQUIRED);
         }
-        if (userRepository.existsByEmail(request.email())) {
+        String email = normalize(request.email());
+        if (userRepository.existsByEmail(email)) {
             throw new SignalException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
 
-        verificationService.consumeToken(request.verificationToken(), request.email(), Purpose.SIGNUP);
+        verificationService.consumeToken(request.verificationToken(), email, Purpose.SIGNUP);
 
         User user = User.builder()
-                .email(request.email())
+                .email(email)
                 .password(passwordEncoder.encode(request.password()))
                 .name(request.name())
                 .age(request.age())
@@ -68,9 +70,10 @@ public class AuthService {
             throw new SignalException(ErrorCode.PASSWORD_MISMATCH);
         }
 
-        verificationService.consumeToken(request.verificationToken(), request.email(), Purpose.PASSWORD_RESET);
+        String email = normalize(request.email());
+        verificationService.consumeToken(request.verificationToken(), email, Purpose.PASSWORD_RESET);
 
-        User user = userRepository.findByEmail(request.email())
+        User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new SignalException(ErrorCode.NOT_FOUND));
 
         user.updatePassword(passwordEncoder.encode(request.newPassword()));
@@ -98,6 +101,11 @@ public class AuthService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new SignalException(ErrorCode.NOT_FOUND));
         user.invalidateTokens();
+    }
+
+    /** 메일 주소는 대소문자·앞뒤 공백을 무시한다. 인증·가입·로그인이 같은 값으로 비교·저장되도록 진입 시점에 한 번 정규화한다. */
+    private static String normalize(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private TokenResponse issueTokens(User user) {

@@ -127,4 +127,21 @@ class AuthServiceTest {
 
         assertInvalidRefreshToken(oldRefreshToken);
     }
+
+    @Test
+    void 가입은_이메일을_소문자로_정규화해_저장한다() {
+        when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
+        when(userRepository.save(org.mockito.ArgumentMatchers.any(User.class))).thenAnswer(i -> i.getArgument(0));
+        com.signal.domain.auth.dto.request.SignupRequest request = new com.signal.domain.auth.dto.request.SignupRequest(
+                " User@Example.com ", "password1", "vrf_token", "사용자", 20, User.Gender.MALE,
+                new com.signal.domain.auth.dto.request.SignupRequest.Agreements(true, true));
+
+        authService.signup(request);
+
+        org.mockito.ArgumentCaptor<User> saved = org.mockito.ArgumentCaptor.forClass(User.class);
+        org.mockito.Mockito.verify(userRepository).save(saved.capture());
+        assertThat(saved.getValue().getEmail()).isEqualTo("user@example.com");
+        org.mockito.Mockito.verify(verificationService).consumeToken("vrf_token", "user@example.com",
+                VerificationService.Purpose.SIGNUP);
+    }
 }
