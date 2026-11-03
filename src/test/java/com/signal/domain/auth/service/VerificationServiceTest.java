@@ -139,4 +139,13 @@ class VerificationServiceTest {
 
         verify(mailService, times(1)).sendVerificationCode(eq(EMAIL), anyString());
     }
+
+    @Test
+    void 이메일_대소문자와_앞뒤_공백이_달라도_같은_주소로_인증한다() {
+        String code = sendAndCaptureCode(Purpose.SIGNUP);
+
+        String token = verificationService.verifyCode("  " + EMAIL.toUpperCase() + " ", code, Purpose.SIGNUP);
+
+        verificationService.consumeToken(token, EMAIL, Purpose.SIGNUP);   // 예외 없이 통과
+    }
 }
