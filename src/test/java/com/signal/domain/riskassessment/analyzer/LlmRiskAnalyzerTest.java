@@ -14,6 +14,7 @@ import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import com.signal.domain.riskassessment.dto.response.FaceResponse;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
@@ -65,6 +66,42 @@ class LlmRiskAnalyzerTest {
         // 얼굴 박스가 실제 이미지(400x300) 픽셀 좌표로 환산되었는지 확인
         assertThat(result.faces().get(0).getBoundingBox().getX()).isEqualTo((int) Math.round(0.2 * 400));
         assertThat(result.faces().get(0).getBoundingBox().getY()).isEqualTo((int) Math.round(0.1 * 300));
+    }
+
+    @Test
+    void 얼굴은_있지만_좌표를_못_받으면_가운데_박스를_지어내지_않고_위치를_비워_둔다() throws IOException {
+        LlmRiskAnalyzer analyzer = new LlmRiskAnalyzer(visionCompletionClient, objectMapper, true);
+        when(visionCompletionClient.complete(any(byte[].class), anyString(), anyString(), anyString()))
+                .thenReturn("""
+                        {"faceDetected": true, "faceBox": null, "imageQualityScore": 80,
+                         "imageQualityNote": "a", "faceExposureScore": 90, "faceExposureNote": "b",
+                         "reverseSearchRiskScore": 30, "reverseSearchRiskNote": "c"}
+                        """);
+
+        RiskAnalysisResult result = analyzer.analyze(samplePngImage());
+
+        assertThat(result.faceDetected()).isTrue();
+        assertThat(result.faces()).hasSize(1);
+        assertThat(result.faces().get(0).getBoundingBox()).isNull();
+        FaceResponse response = FaceResponse.from(result.faces().get(0));
+        assertThat(response.positionKnown()).isFalse();
+        assertThat(response.boundingBox()).isNull();
+    }
+
+    @Test
+    void 좌표를_받으면_positionKnown이_true다() throws IOException {
+        LlmRiskAnalyzer analyzer = new LlmRiskAnalyzer(visionCompletionClient, objectMapper, true);
+        when(visionCompletionClient.complete(any(byte[].class), anyString(), anyString(), anyString()))
+                .thenReturn("""
+                        {"faceDetected": true, "faceBox": {"x":0.2,"y":0.1,"width":0.4,"height":0.5},
+                         "imageQualityScore": 80, "imageQualityNote": "a", "faceExposureScore": 90,
+                         "faceExposureNote": "b", "reverseSearchRiskScore": 30, "reverseSearchRiskNote": "c"}
+                        """);
+
+        FaceResponse response = FaceResponse.from(analyzer.analyze(samplePngImage()).faces().get(0));
+
+        assertThat(response.positionKnown()).isTrue();
+        assertThat(response.boundingBox().x()).isEqualTo(80);
     }
 
     @Test

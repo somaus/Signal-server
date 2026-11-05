@@ -163,23 +163,14 @@ public class LlmRiskAnalyzer implements RiskAnalyzer {
         int imgHeight = pixelSize[1];
         FaceBox box = parsed.faceBox();
 
-        BoundingBox boundingBox;
+        // LLM이 좌표를 못 주거나 실제 픽셀 크기를 읽지 못했으면 박스를 지어내지 않고 비워 둔다(위치 알 수 없음).
+        BoundingBox boundingBox = null;
         if (box != null && imgWidth > 0 && imgHeight > 0) {
             boundingBox = BoundingBox.builder()
                     .x(toPixel(box.x(), imgWidth))
                     .y(toPixel(box.y(), imgHeight))
                     .width(Math.max(1, toPixel(box.width(), imgWidth)))
                     .height(Math.max(1, toPixel(box.height(), imgHeight)))
-                    .build();
-        } else {
-            // LLM이 좌표를 못 주거나 실제 픽셀 크기를 읽지 못한 경우, 이미지 중심 영역으로 근사한다.
-            int fallbackWidth = Math.max(imgWidth, 200);
-            int fallbackHeight = Math.max(imgHeight, 200);
-            boundingBox = BoundingBox.builder()
-                    .x(fallbackWidth / 4)
-                    .y(fallbackHeight / 4)
-                    .width(fallbackWidth / 2)
-                    .height(fallbackHeight / 2)
                     .build();
         }
 
