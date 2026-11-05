@@ -66,4 +66,12 @@ class DeepfakeDetectionResponseTest {
         assertThat(response.provenanceSignals()).isEmpty();
         assertThat(response.riskScore()).isEqualTo(55);
     }
+
+    @Test
+    void 웹_검색_사용_가능_여부를_함께_내려준다() {
+        DeepfakeDetection detection = DeepfakeDetection.builder().fileUrl("/uploads/a.png").build();
+
+        assertThat(DeepfakeDetectionResponse.from(detection, null, true).webSearchAvailable()).isTrue();
+        assertThat(DeepfakeDetectionResponse.from(detection).webSearchAvailable()).isFalse();
+    }
 }
