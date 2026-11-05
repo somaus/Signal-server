@@ -40,6 +40,9 @@ public enum ErrorCode {
     // 이미지 보호
     PROTECTION_NOT_READY(HttpStatus.CONFLICT, "이미지 보호 처리가 아직 완료되지 않았습니다."),
 
+    // 웹 검색
+    WEB_SEARCH_DISABLED(HttpStatus.NOT_FOUND, "웹 검색 기능을 아직 사용할 수 없습니다."),
+
     // 얼굴 도용 모니터링
     MONITORING_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "등록할 수 있는 모니터링 수를 초과했습니다. 기존 모니터링을 삭제한 뒤 다시 시도해주세요."),
 
