@@ -79,6 +79,20 @@ class RiskAssessmentProcessorTest {
     }
 
     @Test
+    void 이미_TIMEOUT으로_정리된_건은_뒤늦게_분석이_끝나도_되살리지_않는다() {
+        assessment.fail(AssessmentFailureReason.TIMEOUT);
+        when(riskAnalyzer.analyze(any(MultipartFile.class)))
+                .thenReturn(new RiskAnalysisResult(true, RiskLevel.HIGH, 80, List.of(), List.of(), List.of(), false));
+
+        processor.process(7L, "photo.png", "image/png", CONTENT);
+
+        assertThat(assessment.getStatus()).isEqualTo(RiskAssessmentStatus.FAILED);
+        assertThat(assessment.getFailureReason()).isEqualTo(AssessmentFailureReason.TIMEOUT);
+        assertThat(assessment.getOverallRiskLevel()).isNull();
+        verify(riskAssessmentRepository, never()).save(any());
+    }
+
+    @Test
     void 분석기에는_업로드_바이트와_파일_정보가_그대로_전달된다() {
         when(riskAnalyzer.analyze(any(MultipartFile.class))).thenAnswer(invocation -> {
             MultipartFile file = invocation.getArgument(0);

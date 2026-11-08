@@ -3,6 +3,7 @@ package com.signal.domain.riskassessment.service;
 import com.signal.domain.riskassessment.analyzer.RiskAnalysisResult;
 import com.signal.domain.riskassessment.analyzer.RiskAnalyzer;
 import com.signal.domain.riskassessment.entity.AssessmentFailureReason;
+import com.signal.domain.riskassessment.entity.RiskAssessmentStatus;
 import com.signal.domain.riskassessment.repository.RiskAssessmentRepository;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
@@ -51,6 +52,12 @@ public class RiskAssessmentProcessor {
 
     private void markCompleted(Long assessmentId, RiskAnalysisResult result) {
         riskAssessmentRepository.findById(assessmentId).ifPresent(assessment -> {
+            if (assessment.getStatus() != RiskAssessmentStatus.PROCESSING) {
+                // 조회 시점에 이미 TIMEOUT으로 정리된 건이 뒤늦게 COMPLETED로 되살아나지 않게 한다.
+                log.info("이미 마무리된 분석이라 결과를 버립니다: assessmentId={}, status={}", assessmentId,
+                        assessment.getStatus());
+                return;
+            }
             assessment.complete(result.overallRiskLevel(), result.overallScore(), true, result.factors(),
                     result.recommendations(), result.faces(), result.fallbackUsed());
             riskAssessmentRepository.save(assessment);
@@ -59,6 +66,9 @@ public class RiskAssessmentProcessor {
 
     private void markFailed(Long assessmentId, AssessmentFailureReason reason) {
         riskAssessmentRepository.findById(assessmentId).ifPresent(assessment -> {
+            if (assessment.getStatus() != RiskAssessmentStatus.PROCESSING) {
+                return;
+            }
             assessment.fail(reason);
             riskAssessmentRepository.save(assessment);
         });
