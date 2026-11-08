@@ -66,7 +66,9 @@ public class Report {
     @Column(length = 3000)
     private String additionalNotes;
 
-    private String documentUrl;
+    /** AI가 요약한 사건 개요. 요약을 만들지 못했거나 원문이 짧으면 null이다. */
+    @Column(length = 1500)
+    private String summary;
 
     @ElementCollection(fetch = FetchType.EAGER)
     @CollectionTable(name = "report_timeline", joinColumns = @JoinColumn(name = "report_id"))
@@ -79,7 +81,7 @@ public class Report {
     @Builder
     public Report(Long userId, LocalDate incidentDate, String discoveryRoute, String damageType,
                   String description, List<String> sourceUrls, List<Long> evidenceIds,
-                  String targetAgencyType, String additionalNotes, String documentUrl) {
+                  String targetAgencyType, String additionalNotes) {
         this.userId = userId;
         this.status = ReportStatus.DRAFT;
         this.incidentDate = incidentDate;
@@ -90,7 +92,6 @@ public class Report {
         this.evidenceIds = evidenceIds;
         this.targetAgencyType = targetAgencyType;
         this.additionalNotes = additionalNotes;
-        this.documentUrl = documentUrl;
         this.timeline = new ArrayList<>();
         this.timeline.add(TimelineEntry.builder().event(TimelineEvent.CREATED).occurredAt(LocalDateTime.now()).build());
         this.createdAt = LocalDateTime.now();
@@ -106,8 +107,7 @@ public class Report {
     public void applyPatch(Optional<LocalDate> incidentDate, Optional<String> discoveryRoute,
                             Optional<String> damageType, String description,
                             Optional<List<String>> sourceUrls, Optional<List<Long>> evidenceIds,
-                            Optional<String> targetAgencyType, Optional<String> additionalNotes,
-                            String documentUrl) {
+                            Optional<String> targetAgencyType, Optional<String> additionalNotes) {
         if (incidentDate != null) {
             this.incidentDate = incidentDate.orElse(null);
         }
@@ -132,13 +132,15 @@ public class Report {
         if (additionalNotes != null) {
             this.additionalNotes = additionalNotes.orElse(null);
         }
-        this.documentUrl = documentUrl;
         this.timeline.add(TimelineEntry.builder().event(TimelineEvent.UPDATED).occurredAt(LocalDateTime.now()).build());
     }
 
-    public void markFinalized(String documentUrl) {
+    public void updateSummary(String summary) {
+        this.summary = summary;
+    }
+
+    public void markFinalized() {
         this.status = ReportStatus.FINALIZED;
-        this.documentUrl = documentUrl;
         this.timeline.add(TimelineEntry.builder().event(TimelineEvent.FINALIZED).occurredAt(LocalDateTime.now()).build());
     }
 }

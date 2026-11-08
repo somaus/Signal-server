@@ -86,7 +86,6 @@ public class UserDataEraser {
         monitoringRepository.deleteAll(monitorings);
 
         List<Report> reports = reportRepository.findByUserIdOrderByCreatedAtDesc(userId);
-        reports.forEach(report -> add(files, report.getDocumentUrl()));
         reportRepository.deleteAll(reports);
 
         List<ReportEvidence> evidences = reportEvidenceRepository.findByUserId(userId);

@@ -5,9 +5,10 @@ import com.signal.domain.report.dto.request.UpdateReportRequest;
 import com.signal.domain.report.entity.Report;
 import com.signal.domain.report.entity.ReportEvidence;
 import com.signal.domain.report.entity.ReportStatus;
-import com.signal.domain.report.generator.ReportDocumentGenerator;
+import com.signal.domain.report.document.ReportPdfRenderer;
 import com.signal.domain.report.repository.ReportEvidenceRepository;
 import com.signal.domain.report.repository.ReportRepository;
+import com.signal.domain.report.summary.ReportSummarizer;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.file.FileStorage;
@@ -35,15 +36,14 @@ public class ReportService {
 
     private final ReportRepository reportRepository;
     private final ReportEvidenceRepository reportEvidenceRepository;
-    private final ReportDocumentGenerator reportDocumentGenerator;
+    private final ReportSummarizer reportSummarizer;
+    private final ReportPdfRenderer reportPdfRenderer;
     private final FileStorage fileStorage;
 
     @Transactional
     public Report createReport(Long userId, CreateReportRequest request) {
         validateRequired(request.description(), request.sourceUrls());
         validateEvidenceOwnership(userId, request.evidenceIds());
-
-        String documentUrl = reportDocumentGenerator.generate(ReportStatus.DRAFT);
 
         Report report = Report.builder()
                 .userId(userId)
@@ -55,8 +55,8 @@ public class ReportService {
                 .evidenceIds(request.evidenceIds() != null ? request.evidenceIds() : List.of())
                 .targetAgencyType(request.targetAgencyType())
                 .additionalNotes(request.additionalNotes())
-                .documentUrl(documentUrl)
                 .build();
+        report.updateSummary(reportSummarizer.summarize(report.getDescription(), report.getDamageType()).orElse(null));
 
         return reportRepository.save(report);
     }
@@ -78,11 +78,16 @@ public class ReportService {
             validateEvidenceOwnership(userId, request.getEvidenceIds().orElse(null));
         }
 
-        String documentUrl = reportDocumentGenerator.generate(ReportStatus.DRAFT);
+        boolean descriptionChanged = description != null && !description.equals(report.getDescription());
         report.applyPatch(
                 request.getIncidentDate(), request.getDiscoveryRoute(), request.getDamageType(),
                 description, request.getSourceUrls(), request.getEvidenceIds(),
-                request.getTargetAgencyType(), request.getAdditionalNotes(), documentUrl);
+                request.getTargetAgencyType(), request.getAdditionalNotes());
+        if (descriptionChanged) {
+            // 원문이 바뀌면 옛 요약이 남지 않게 다시 만든다. 못 만들면 요약 없이 둔다.
+            report.updateSummary(
+                    reportSummarizer.summarize(report.getDescription(), report.getDamageType()).orElse(null));
+        }
 
         return report;
     }
@@ -92,17 +97,21 @@ public class ReportService {
         Report report = getOwnedReport(userId, reportId);
         validateDraft(report);
 
-        String documentUrl = reportDocumentGenerator.generate(ReportStatus.FINALIZED);
-        report.markFinalized(documentUrl);
+        report.markFinalized();
 
         return report;
+    }
+
+    /** 신고 문서(PDF)를 신고서 내용으로 만들어 돌려준다. 본인 신고서만 가능하다. */
+    public byte[] renderDocument(Long userId, Long reportId) {
+        return reportPdfRenderer.render(getOwnedReport(userId, reportId));
     }
 
     @Transactional
     public void deleteReport(Long userId, Long reportId) {
         Report report = getOwnedReport(userId, reportId);
 
-        // 다른 신고서에서도 쓰는 증거는 남기고, 이 신고서에만 연결된 증거와 신고서 파일을 함께 지운다.
+        // 다른 신고서에서도 쓰는 증거는 남기고, 이 신고서에만 연결된 증거 파일을 함께 지운다.
         Set<Long> usedByOthers = new HashSet<>();
         reportRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
                 .filter(other -> !other.getId().equals(reportId))
@@ -116,10 +125,8 @@ public class ReportService {
         reportRepository.delete(report);
         reportEvidenceRepository.deleteAll(evidences);
 
-        TransactionUtils.runAfterCommit(() -> {
-            fileStorage.delete(report.getDocumentUrl());
-            evidences.forEach(evidence -> fileStorage.delete(evidence.getFileUrl()));
-        });
+        TransactionUtils.runAfterCommit(() ->
+                evidences.forEach(evidence -> fileStorage.delete(evidence.getFileUrl())));
     }
 
     @Transactional
