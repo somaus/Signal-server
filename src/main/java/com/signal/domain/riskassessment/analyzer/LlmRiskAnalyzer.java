@@ -17,6 +17,8 @@ import com.signal.global.i18n.ResponseLanguage;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.net.SocketTimeoutException;
+import java.net.http.HttpTimeoutException;
 import java.util.List;
 import javax.imageio.ImageIO;
 import lombok.extern.slf4j.Slf4j;
@@ -91,8 +93,17 @@ public class LlmRiskAnalyzer implements RiskAnalyzer {
             return analyzeWithLlm(image);
         } catch (Exception e) {
             log.warn("LLM 위험도 분석 실패, 분석하지 못함으로 응답합니다.", e);
-            throw new SignalException(ErrorCode.ANALYSIS_UNAVAILABLE);
+            throw new SignalException(isTimeout(e) ? ErrorCode.ANALYSIS_TIMEOUT : ErrorCode.ANALYSIS_UNAVAILABLE);
         }
+    }
+
+    private static boolean isTimeout(Throwable e) {
+        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
+            if (cause instanceof SocketTimeoutException || cause instanceof HttpTimeoutException) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private RiskAnalysisResult analyzeWithLlm(MultipartFile image) throws IOException {
