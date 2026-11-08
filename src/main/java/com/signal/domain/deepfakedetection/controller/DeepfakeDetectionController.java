@@ -44,7 +44,7 @@ public class DeepfakeDetectionController {
 
     /**
      * 이 사진을 웹에서 찾아본다. 사용자가 버튼을 눌러 사진이 외부 검색 서비스로 전송되는 데 동의한 뒤에만 부른다.
-     * 사진 하나에 한 번만 검색하며, 이미 했으면 그 결과를 돌려준다. 기능이 꺼져 있으면 404.
+     * 사진 하나에 한 번만 검색하며, 이미 했으면 그 결과를 돌려준다. 기능이 꺼져 있으면 404 WEB_SEARCH_DISABLED(결과가 없을 때의 NOT_FOUND와 코드로 구분한다).
      */
     @PostMapping("/{detectionId}/web-search")
     public ResponseEntity<WebSearchResponse> startWebSearch(
@@ -52,7 +52,8 @@ public class DeepfakeDetectionController {
             @RequestHeader(value = "X-Anonymous-Id", required = false) String anonymousId,
             @PathVariable Long detectionId) {
         if (!webSearchService.isEnabled()) {
-            throw new SignalException(ErrorCode.NOT_FOUND);
+            // 탐지 결과가 없는 경우의 NOT_FOUND와 구분해, 화면이 "준비 중"을 정확히 보여 줄 수 있게 한다.
+            throw new SignalException(ErrorCode.WEB_SEARCH_DISABLED);
         }
         if (userId == null && !StringUtils.hasText(anonymousId)) {
             throw new SignalException(ErrorCode.ANONYMOUS_ID_REQUIRED);
@@ -78,6 +79,7 @@ public class DeepfakeDetectionController {
             @RequestHeader(value = "X-Anonymous-Id", required = false) String anonymousId,
             @PathVariable Long detectionId) {
         DeepfakeDetection detection = deepfakeDetectionService.getDetection(userId, anonymousId, detectionId);
-        return ResponseEntity.ok(DeepfakeDetectionResponse.from(detection, webSearchService.find(detectionId)));
+        return ResponseEntity.ok(DeepfakeDetectionResponse.from(detection, webSearchService.find(detectionId),
+                webSearchService.isEnabled()));
     }
 }
