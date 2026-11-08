@@ -94,7 +94,7 @@ class UserDataEraserTest {
         monitoring = Monitoring.builder().userId(USER_ID).referenceImageUrl("/uploads/monitoring/m.png").build();
         ReflectionTestUtils.setField(monitoring, "id", 9L);
         report = Report.builder().userId(USER_ID).description("설명").sourceUrls(List.of()).evidenceIds(List.of())
-                .documentUrl("/uploads/reports/r.pdf").build();
+                .build();
         evidence = ReportEvidence.builder().userId(USER_ID).fileUrl("/uploads/report-evidences/e.png").build();
         connection = AgencyConnection.builder().userId(USER_ID).agencyId(3L).connectionType(ConnectionType.WEB)
                 .attachedReportUrl("/uploads/reports/c.pdf").build();
@@ -138,7 +138,6 @@ class UserDataEraserTest {
         verify(fileStorage).delete("/uploads/deepfake-detections/h.png");
         verify(fileStorage).delete("/uploads/protections/p.png");
         verify(fileStorage).delete("/uploads/monitoring/m.png");
-        verify(fileStorage).delete("/uploads/reports/r.pdf");
         verify(fileStorage).delete("/uploads/report-evidences/e.png");
         verify(fileStorage).delete("/uploads/reports/c.pdf");
     }
