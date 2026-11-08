@@ -1,8 +1,5 @@
 package com.signal.domain.riskassessment.analyzer;
 
-import com.drew.imaging.ImageMetadataReader;
-import com.drew.metadata.Metadata;
-import com.drew.metadata.exif.GpsDirectory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.signal.domain.riskassessment.entity.BoundingBox;
 import com.signal.domain.riskassessment.entity.DetectedFace;
@@ -23,6 +20,7 @@ import java.util.List;
 import javax.imageio.ImageIO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -44,6 +42,7 @@ import org.springframework.web.multipart.MultipartFile;
  */
 @Slf4j
 @Component
+@ConditionalOnProperty(name = "risk-analysis.mode", havingValue = "llm", matchIfMissing = true)
 public class LlmRiskAnalyzer implements RiskAnalyzer {
 
     private static final String SYSTEM_PROMPT = """
@@ -109,7 +108,7 @@ public class LlmRiskAnalyzer implements RiskAnalyzer {
     private RiskAnalysisResult analyzeWithLlm(MultipartFile image) throws IOException {
         byte[] content = image.getBytes();
         int[] pixelSize = readPixelSize(content);
-        boolean hasGpsMetadata = hasGpsMetadata(content);
+        boolean hasGpsMetadata = GpsMetadata.present(content);
 
         ResponseLanguage language = LanguageContext.current();
         String userPrompt = buildUserPrompt(pixelSize);
@@ -218,19 +217,6 @@ public class LlmRiskAnalyzer implements RiskAnalyzer {
         } catch (Exception e) {
             log.warn("이미지 픽셀 크기 판독 실패", e);
             return new int[]{0, 0};
-        }
-    }
-
-    private boolean hasGpsMetadata(byte[] content) {
-        try {
-            Metadata metadata = ImageMetadataReader.readMetadata(new ByteArrayInputStream(content));
-            GpsDirectory gpsDirectory = metadata.getFirstDirectoryOfType(GpsDirectory.class);
-            return gpsDirectory != null
-                    && gpsDirectory.getGeoLocation() != null
-                    && !gpsDirectory.getGeoLocation().isZero();
-        } catch (Exception e) {
-            // EXIF가 없거나 판독 불가한 형식이면 GPS 정보 없음으로 간주한다.
-            return false;
         }
     }
 
