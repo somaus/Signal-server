@@ -4,27 +4,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import com.signal.domain.riskassessment.analyzer.RiskAnalysisResult;
-import com.signal.domain.riskassessment.analyzer.RiskAnalyzer;
-import com.signal.domain.riskassessment.entity.BoundingBox;
-import com.signal.domain.riskassessment.entity.DetectedFace;
+import com.signal.domain.riskassessment.entity.AssessmentFailureReason;
 import com.signal.domain.riskassessment.entity.RiskAssessment;
-import com.signal.domain.riskassessment.entity.RiskFactor;
+import com.signal.domain.riskassessment.entity.RiskAssessmentStatus;
 import com.signal.domain.riskassessment.entity.RiskLevel;
 import com.signal.domain.riskassessment.repository.RiskAssessmentRepository;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.file.FileStorage;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
 
@@ -35,7 +36,7 @@ class RiskAssessmentServiceTest {
     private RiskAssessmentRepository riskAssessmentRepository;
 
     @Mock
-    private RiskAnalyzer riskAnalyzer;
+    private RiskAssessmentProcessor riskAssessmentProcessor;
 
     @Mock
     private FileStorage fileStorage;
@@ -44,7 +45,20 @@ class RiskAssessmentServiceTest {
 
     @BeforeEach
     void setUp() {
-        riskAssessmentService = new RiskAssessmentService(riskAssessmentRepository, riskAnalyzer, fileStorage);
+        riskAssessmentService = new RiskAssessmentService(riskAssessmentRepository, riskAssessmentProcessor, fileStorage);
+    }
+
+    private RiskAssessment completedAssessment(Long userId) {
+        return RiskAssessment.builder()
+                .userId(userId)
+                .imageUrl("/uploads/risk-assessments/generated.png")
+                .overallRiskLevel(RiskLevel.LOW)
+                .overallScore(10)
+                .faceDetected(true)
+                .factors(List.of())
+                .recommendations(List.of())
+                .faces(List.of())
+                .build();
     }
 
     @Test
@@ -57,44 +71,61 @@ class RiskAssessmentServiceTest {
     }
 
     @Test
-    void 위험도_진단을_요청하면_분석결과가_저장되고_반환된다() {
-        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", new byte[]{1, 2, 3});
-        RiskAnalysisResult result = new RiskAnalysisResult(
-                true,
-                RiskLevel.HIGH,
-                80,
-                List.of(RiskFactor.builder().type("IMAGE_QUALITY").label("이미지 품질").score(80).description("설명").build()),
-                List.of("공개를 자제하세요."),
-                List.of(DetectedFace.builder()
-                        .faceIndex(0)
-                        .boundingBox(BoundingBox.builder().x(1).y(2).width(3).height(4).build())
-                        .build()),
-                false);
+    void 내_분석_목록은_완료된_분석만_조회한다() {
+        RiskAssessment completed = completedAssessment(1L);
+        when(riskAssessmentRepository.findByUserIdAndStatusOrderByCreatedAtDesc(1L, RiskAssessmentStatus.COMPLETED))
+                .thenReturn(List.of(completed));
 
-        when(riskAnalyzer.analyze(image)).thenReturn(result);
-        when(fileStorage.store(any(), anyString())).thenReturn("/uploads/risk-assessments/generated.png");
-        when(riskAssessmentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        assertThat(riskAssessmentService.getMyAssessments(1L)).containsExactly(completed);
+    }
+
+    @Test
+    void 위험도_진단을_요청하면_PROCESSING으로_접수되고_분석은_백그라운드로_넘어간다() {
+        byte[] bytes = new byte[]{1, 2, 3};
+        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", bytes);
+        when(fileStorage.store(any(MockMultipartFile.class), anyString()))
+                .thenReturn("/uploads/risk-assessments/generated.png");
+        when(riskAssessmentRepository.save(any())).thenAnswer(invocation -> {
+            RiskAssessment assessment = invocation.getArgument(0);
+            ReflectionTestUtils.setField(assessment, "id", 7L);
+            return assessment;
+        });
 
         RiskAssessment saved = riskAssessmentService.createAssessment(1L, null, image);
 
         assertThat(saved.getUserId()).isEqualTo(1L);
-        assertThat(saved.getOverallRiskLevel()).isEqualTo(RiskLevel.HIGH);
-        assertThat(saved.getOverallScore()).isEqualTo(80);
-        assertThat(saved.isFaceDetected()).isTrue();
-        assertThat(saved.getFactors()).hasSize(1);
-        assertThat(saved.getFaces()).hasSize(1);
-        assertThat(saved.isFallbackUsed()).isFalse();
+        assertThat(saved.getStatus()).isEqualTo(RiskAssessmentStatus.PROCESSING);
+        assertThat(saved.getOverallRiskLevel()).isNull();
+        assertThat(saved.getOverallScore()).isNull();
+        assertThat(saved.getFailureReason()).isNull();
+        assertThat(saved.getImageUrl()).isEqualTo("/uploads/risk-assessments/generated.png");
         verify(fileStorage).store(image, "risk-assessments");
+        verify(riskAssessmentProcessor).process(eq(7L), eq("photo.png"), eq("image/png"), eq(bytes));
     }
 
     @Test
-    void 얼굴이_검출되지_않으면_예외가_발생한다() {
-        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", new byte[]{1, 2, 3});
-        when(riskAnalyzer.analyze(image)).thenReturn(RiskAnalysisResult.faceNotDetected(false));
+    void 비회원은_익명_식별자가_없으면_접수되지_않고_분석도_시작되지_않는다() {
+        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", new byte[]{1});
 
-        assertThatThrownBy(() -> riskAssessmentService.createAssessment(1L, null, image))
+        assertThatThrownBy(() -> riskAssessmentService.createAssessment(null, " ", image))
                 .isInstanceOf(SignalException.class)
-                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FACE_NOT_DETECTED);
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ANONYMOUS_ID_REQUIRED);
+
+        verifyNoInteractions(riskAssessmentProcessor);
+    }
+
+    @Test
+    void 비회원은_실패한_분석을_이용_횟수에서_제외하고_센다() {
+        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", new byte[]{1});
+        when(riskAssessmentRepository.countByAnonymousIdAndStatusNot("anon-1", RiskAssessmentStatus.FAILED))
+                .thenReturn(5L);
+
+        assertThatThrownBy(() -> riskAssessmentService.createAssessment(null, "anon-1", image))
+                .isInstanceOf(SignalException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ANONYMOUS_RISK_ASSESSMENT_LIMIT_EXCEEDED);
+
+        verify(riskAssessmentRepository, never()).save(any());
+        verifyNoInteractions(riskAssessmentProcessor);
     }
 
     @Test
@@ -118,21 +149,37 @@ class RiskAssessmentServiceTest {
 
     @Test
     void 존재하는_소유자가_조회하면_결과를_반환한다() {
-        RiskAssessment riskAssessment = RiskAssessment.builder()
-                .userId(1L)
-                .imageUrl("/uploads/risk-assessments/generated.png")
-                .overallRiskLevel(RiskLevel.LOW)
-                .overallScore(10)
-                .faceDetected(true)
-                .factors(List.of())
-                .recommendations(List.of())
-                .faces(List.of())
-                .build();
+        RiskAssessment riskAssessment = completedAssessment(1L);
         when(riskAssessmentRepository.findById(1L)).thenReturn(Optional.of(riskAssessment));
 
         RiskAssessment result = riskAssessmentService.getAssessment(1L, null, 1L);
 
         assertThat(result).isEqualTo(riskAssessment);
+    }
+
+    @Test
+    void 처리_중인_분석은_PROCESSING_그대로_반환한다() {
+        RiskAssessment processing = RiskAssessment.processing(1L, null, "/uploads/risk-assessments/a.png");
+        when(riskAssessmentRepository.findById(1L)).thenReturn(Optional.of(processing));
+
+        RiskAssessment result = riskAssessmentService.getAssessment(1L, null, 1L);
+
+        assertThat(result.getStatus()).isEqualTo(RiskAssessmentStatus.PROCESSING);
+        verify(riskAssessmentRepository, never()).save(any());
+    }
+
+    @Test
+    void 오래_PROCESSING에_머문_분석은_조회할_때_시간초과_실패로_정리한다() {
+        RiskAssessment stuck = RiskAssessment.processing(1L, null, "/uploads/risk-assessments/a.png");
+        ReflectionTestUtils.setField(stuck, "createdAt", LocalDateTime.now().minusMinutes(6));
+        when(riskAssessmentRepository.findById(1L)).thenReturn(Optional.of(stuck));
+        when(riskAssessmentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        RiskAssessment result = riskAssessmentService.getAssessment(1L, null, 1L);
+
+        assertThat(result.getStatus()).isEqualTo(RiskAssessmentStatus.FAILED);
+        assertThat(result.getFailureReason()).isEqualTo(AssessmentFailureReason.TIMEOUT);
+        verify(riskAssessmentRepository).save(stuck);
     }
 
     @Test
@@ -146,17 +193,7 @@ class RiskAssessmentServiceTest {
 
     @Test
     void 소유자가_아니면_예외가_발생한다() {
-        RiskAssessment riskAssessment = RiskAssessment.builder()
-                .userId(2L)
-                .imageUrl("/uploads/risk-assessments/generated.png")
-                .overallRiskLevel(RiskLevel.LOW)
-                .overallScore(10)
-                .faceDetected(true)
-                .factors(List.of())
-                .recommendations(List.of())
-                .faces(List.of())
-                .build();
-        when(riskAssessmentRepository.findById(1L)).thenReturn(Optional.of(riskAssessment));
+        when(riskAssessmentRepository.findById(1L)).thenReturn(Optional.of(completedAssessment(2L)));
 
         assertThatThrownBy(() -> riskAssessmentService.getAssessment(1L, null, 1L))
                 .isInstanceOf(SignalException.class)

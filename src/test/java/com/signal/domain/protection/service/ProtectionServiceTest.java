@@ -63,6 +63,18 @@ class ProtectionServiceTest {
     }
 
     @Test
+    void 분석이_끝나지_않은_진단은_보호할_수_없다() {
+        when(riskAssessmentService.getAssessment(1L, null, 10L))
+                .thenReturn(com.signal.domain.riskassessment.entity.RiskAssessment.processing(1L, null, "/uploads/a.png"));
+
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> protectionService.createProtection(1L, 10L, ProtectionLevel.NORMAL))
+                .isInstanceOf(com.signal.global.exception.SignalException.class)
+                .hasFieldOrPropertyWithValue("errorCode", com.signal.global.exception.ErrorCode.CONFLICT);
+
+        org.mockito.Mockito.verifyNoInteractions(imageProtector);
+    }
+
+    @Test
     void 보호_요청을_생성하면_PROCESSING_상태로_저장되고_비동기_처리가_시작된다() {
         when(riskAssessmentService.getAssessment(1L, null, 10L)).thenReturn(sampleRiskAssessment());
         when(protectionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

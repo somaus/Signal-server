@@ -135,6 +135,17 @@ class LlmRiskAnalyzerTest {
     }
 
     @Test
+    void LLM_호출이_시간초과면_분석_시간_초과로_응답한다() throws IOException {
+        LlmRiskAnalyzer analyzer = new LlmRiskAnalyzer(visionCompletionClient, objectMapper, true);
+        when(visionCompletionClient.complete(any(byte[].class), anyString(), anyString(), anyString()))
+                .thenThrow(new IllegalStateException("호출 실패", new java.net.SocketTimeoutException("Read timed out")));
+
+        assertThatThrownBy(() -> analyzer.analyze(samplePngImage()))
+                .isInstanceOfSatisfying(SignalException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ANALYSIS_TIMEOUT));
+    }
+
+    @Test
     void vision_llm_비활성화면_LLM을_호출하지_않고_분석_불가로_응답한다() throws IOException {
         LlmRiskAnalyzer analyzer = new LlmRiskAnalyzer(visionCompletionClient, objectMapper, false);
 
