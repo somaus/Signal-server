@@ -7,6 +7,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.signal.domain.user.repository.UserRepository;
+import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,7 +58,8 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
         when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
-        when(userRepository.existsById(1L)).thenReturn(true);
+        when(jwtProvider.getTokenVersion(TOKEN)).thenReturn(0);
+        when(userRepository.findTokenVersionById(1L)).thenReturn(Optional.of(0));
 
         Authentication authentication = doFilterWithBearer(TOKEN);
 
@@ -66,11 +68,22 @@ class JwtAuthenticationFilterTest {
     }
 
     @Test
+    void 로그아웃으로_tokenVersion이_올라간_뒤의_옛_액세스_토큰으로는_인증하지_않는다() throws Exception {
+        when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
+        when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
+        when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
+        when(jwtProvider.getTokenVersion(TOKEN)).thenReturn(0);
+        when(userRepository.findTokenVersionById(1L)).thenReturn(Optional.of(1));
+
+        assertThat(doFilterWithBearer(TOKEN)).isNull();
+    }
+
+    @Test
     void 탈퇴한_사용자의_토큰이면_인증하지_않는다() throws Exception {
         when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
         when(jwtProvider.getUserId(TOKEN)).thenReturn(99L);
-        when(userRepository.existsById(99L)).thenReturn(false);
+        when(userRepository.findTokenVersionById(99L)).thenReturn(Optional.empty());
 
         assertThat(doFilterWithBearer(TOKEN)).isNull();
     }
@@ -81,7 +94,7 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(true);
 
         assertThat(doFilterWithBearer(TOKEN)).isNull();
-        verify(userRepository, never()).existsById(anyLong());
+        verify(userRepository, never()).findTokenVersionById(anyLong());
     }
 
     @Test

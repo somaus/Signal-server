@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+import com.signal.domain.auth.dto.request.ResetPasswordRequest;
 import com.signal.domain.auth.dto.response.TokenResponse;
 import com.signal.domain.user.entity.User;
 import com.signal.domain.user.repository.UserRepository;
@@ -113,5 +114,34 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.logout(USER_ID))
                 .isInstanceOfSatisfying(SignalException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND));
+    }
+
+    @Test
+    void 비밀번호를_재설정하면_이전_리프레시_토큰으로_재발급할_수_없다() {
+        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        String oldRefreshToken = jwtProvider.createRefreshToken(USER_ID, user.getTokenVersion());
+
+        authService.resetPassword(new ResetPasswordRequest(
+                "user@example.com", "vrf_token", "newpassword1", "newpassword1"));
+
+        assertInvalidRefreshToken(oldRefreshToken);
+    }
+
+    @Test
+    void 가입은_이메일을_소문자로_정규화해_저장한다() {
+        when(userRepository.existsByEmail("user@example.com")).thenReturn(false);
+        when(userRepository.save(org.mockito.ArgumentMatchers.any(User.class))).thenAnswer(i -> i.getArgument(0));
+        com.signal.domain.auth.dto.request.SignupRequest request = new com.signal.domain.auth.dto.request.SignupRequest(
+                " User@Example.com ", "password1", "vrf_token", "사용자", 20, User.Gender.MALE,
+                new com.signal.domain.auth.dto.request.SignupRequest.Agreements(true, true));
+
+        authService.signup(request);
+
+        org.mockito.ArgumentCaptor<User> saved = org.mockito.ArgumentCaptor.forClass(User.class);
+        org.mockito.Mockito.verify(userRepository).save(saved.capture());
+        assertThat(saved.getValue().getEmail()).isEqualTo("user@example.com");
+        org.mockito.Mockito.verify(verificationService).consumeToken("vrf_token", "user@example.com",
+                VerificationService.Purpose.SIGNUP);
     }
 }

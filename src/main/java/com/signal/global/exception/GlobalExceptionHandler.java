@@ -1,15 +1,23 @@
 package com.signal.global.exception;
 
 import com.signal.global.response.ErrorResponse;
+import java.util.Set;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @Slf4j
 @RestControllerAdvice
@@ -51,6 +59,42 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException e) {
         ErrorCode errorCode = ErrorCode.FILE_TOO_LARGE;
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ErrorResponse.of(errorCode.getStatus().value(), errorCode.name(), errorCode.getMessage()));
+    }
+
+    @ExceptionHandler({MissingServletRequestPartException.class, MissingServletRequestParameterException.class,
+            MissingRequestHeaderException.class})
+    public ResponseEntity<ErrorResponse> handleMissingRequestValue(Exception e) {
+        return ResponseEntity
+                .badRequest()
+                .body(ErrorResponse.of(400, ErrorCode.INVALID_INPUT.name(), ErrorCode.INVALID_INPUT.getMessage()));
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(HttpRequestMethodNotSupportedException e) {
+        ErrorCode errorCode = ErrorCode.METHOD_NOT_ALLOWED;
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(errorCode.getStatus());
+        Set<HttpMethod> supported = e.getSupportedHttpMethods();
+        if (supported != null && !supported.isEmpty()) {
+            builder.allow(supported.toArray(new HttpMethod[0]));   // RFC 9110: 405에는 허용 메서드를 알린다
+        }
+        return builder
+                .body(ErrorResponse.of(errorCode.getStatus().value(), errorCode.name(), errorCode.getMessage()));
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFound(NoResourceFoundException e) {
+        ErrorCode errorCode = ErrorCode.NOT_FOUND;
+        return ResponseEntity
+                .status(errorCode.getStatus())
+                .body(ErrorResponse.of(errorCode.getStatus().value(), errorCode.name(), errorCode.getMessage()));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException e) {
+        ErrorCode errorCode = ErrorCode.UNSUPPORTED_CONTENT_TYPE;   // 파일 형식이 아니라 요청 본문 형식 문제
         return ResponseEntity
                 .status(errorCode.getStatus())
                 .body(ErrorResponse.of(errorCode.getStatus().value(), errorCode.name(), errorCode.getMessage()));

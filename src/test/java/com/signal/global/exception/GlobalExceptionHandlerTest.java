@@ -7,6 +7,11 @@ import com.signal.domain.agency.entity.AgencySituationType;
 import com.signal.global.response.ErrorResponse;
 import java.lang.reflect.Method;
 import org.junit.jupiter.api.Test;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.http.HttpMethod;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpInputMessage;
 import org.springframework.http.HttpStatus;
@@ -43,5 +48,42 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody().code()).isEqualTo(ErrorCode.INVALID_INPUT.name());
+    }
+
+    @Test
+    void 필수_파일_파트가_없으면_500이_아니라_400_INVALID_INPUT을_반환한다() {
+        ResponseEntity<ErrorResponse> response =
+                globalExceptionHandler.handleMissingRequestValue(new MissingServletRequestPartException("file"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().code()).isEqualTo(ErrorCode.INVALID_INPUT.name());
+    }
+
+    @Test
+    void 지원하지_않는_HTTP_메서드는_500이_아니라_405를_반환한다() {
+        ResponseEntity<ErrorResponse> response =
+                globalExceptionHandler.handleMethodNotSupported(new HttpRequestMethodNotSupportedException("DELETE", java.util.List.of("GET", "POST")));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.METHOD_NOT_ALLOWED);
+        assertThat(response.getBody().code()).isEqualTo(ErrorCode.METHOD_NOT_ALLOWED.name());
+        assertThat(response.getHeaders().getAllow()).contains(org.springframework.http.HttpMethod.GET);
+    }
+
+    @Test
+    void 없는_경로는_500이_아니라_404를_반환한다() {
+        ResponseEntity<ErrorResponse> response = globalExceptionHandler.handleNoResourceFound(
+                new NoResourceFoundException(HttpMethod.GET, "api/v1/nothing"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(response.getBody().code()).isEqualTo(ErrorCode.NOT_FOUND.name());
+    }
+
+    @Test
+    void 지원하지_않는_Content_Type은_500이_아니라_415를_반환한다() {
+        ResponseEntity<ErrorResponse> response = globalExceptionHandler.handleMediaTypeNotSupported(
+                new HttpMediaTypeNotSupportedException("text/plain"));
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNSUPPORTED_MEDIA_TYPE);
+        assertThat(response.getBody().code()).isEqualTo(ErrorCode.UNSUPPORTED_CONTENT_TYPE.name());
     }
 }

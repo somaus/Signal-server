@@ -6,6 +6,7 @@ import com.signal.global.mail.MailService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -54,7 +55,7 @@ public class VerificationService {
 
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         codes.put(key, new CodeEntry(code, now, now + codeExpiration, 0));
-        mailService.sendVerificationCode(email, code);
+        mailService.sendVerificationCode(email.trim(), code);
         return codeExpiration / 1000;
     }
 
@@ -78,7 +79,7 @@ public class VerificationService {
         }
 
         String token = "vrf_" + UUID.randomUUID().toString().replace("-", "");
-        tokens.put(token, new TokenEntry(email, purpose, now() + tokenExpiration));
+        tokens.put(token, new TokenEntry(normalize(email), purpose, now() + tokenExpiration));
         return token;
     }
 
@@ -88,7 +89,7 @@ public class VerificationService {
 
         if (entry == null
                 || now() > entry.expiresAt()
-                || !entry.email().equals(email)
+                || !entry.email().equals(normalize(email))
                 || entry.purpose() != purpose) {
             throw new SignalException(ErrorCode.INVALID_VERIFICATION);
         }
@@ -114,7 +115,12 @@ public class VerificationService {
     }
 
     private String key(String email, Purpose purpose) {
-        return purpose + ":" + email;
+        return purpose + ":" + normalize(email);
+    }
+
+    /** 메일 주소는 대소문자·앞뒤 공백이 달라도 같은 주소다. 인증은 "A@x.com", 가입은 "a@x.com"으로 하면 거부되던 것을 막는다. */
+    private static String normalize(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 
     private long now() {
