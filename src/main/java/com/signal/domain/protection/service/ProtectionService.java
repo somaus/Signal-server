@@ -6,6 +6,7 @@ import com.signal.domain.protection.entity.ProtectionStatus;
 import com.signal.domain.protection.protector.ImageProtector;
 import com.signal.domain.protection.repository.ProtectionRepository;
 import com.signal.domain.riskassessment.entity.RiskAssessment;
+import com.signal.domain.riskassessment.entity.RiskAssessmentStatus;
 import com.signal.domain.riskassessment.service.RiskAssessmentService;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
@@ -28,6 +29,9 @@ public class ProtectionService {
     @Transactional
     public Protection createProtection(Long userId, Long assessmentId, ProtectionLevel protectionLevel) {
         RiskAssessment riskAssessment = riskAssessmentService.getAssessment(userId, null, assessmentId);
+        if (riskAssessment.getStatus() != RiskAssessmentStatus.COMPLETED) {
+            throw new SignalException(ErrorCode.CONFLICT);
+        }
         ProtectionLevel level = protectionLevel != null ? protectionLevel : ProtectionLevel.NORMAL;
 
         Protection protection = Protection.builder()

@@ -31,7 +31,7 @@ public class RiskAssessmentController {
             @RequestHeader(value = "X-Anonymous-Id", required = false) String anonymousId,
             @RequestPart("image") MultipartFile image) {
         RiskAssessment riskAssessment = riskAssessmentService.createAssessment(userId, anonymousId, image);
-        return ResponseEntity.status(HttpStatus.CREATED).body(RiskAssessmentResponse.from(riskAssessment));
+        return ResponseEntity.status(HttpStatus.ACCEPTED).body(RiskAssessmentResponse.from(riskAssessment));
     }
 
     @GetMapping

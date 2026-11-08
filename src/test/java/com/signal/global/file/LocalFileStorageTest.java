@@ -104,4 +104,15 @@ class LocalFileStorageTest {
                 .isInstanceOfSatisfying(SignalException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
     }
+
+    @Test
+    void 주소가_비어_있으면_삭제를_건너뛴다() throws Exception {
+        LocalFileStorage storage = new LocalFileStorage(tempDir.toString(), "/uploads");
+        storage.init();
+
+        storage.delete(null);
+        storage.delete("  ");
+
+        assertThat(tempDir).exists();
+    }
 }

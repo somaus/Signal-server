@@ -15,6 +15,7 @@ import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
+import com.signal.domain.riskassessment.dto.response.FaceResponse;
 import java.io.IOException;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
@@ -151,6 +152,17 @@ class LlmRiskAnalyzerTest {
         assertThatThrownBy(() -> analyzer.analyze(samplePngImage()))
                 .isInstanceOfSatisfying(SignalException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ANALYSIS_UNAVAILABLE));
+    }
+
+    @Test
+    void LLM_호출이_시간초과면_분석_시간_초과로_응답한다() throws IOException {
+        LlmRiskAnalyzer analyzer = new LlmRiskAnalyzer(visionCompletionClient, objectMapper, true);
+        when(visionCompletionClient.complete(any(byte[].class), anyString(), anyString(), anyString()))
+                .thenThrow(new IllegalStateException("호출 실패", new java.net.SocketTimeoutException("Read timed out")));
+
+        assertThatThrownBy(() -> analyzer.analyze(samplePngImage()))
+                .isInstanceOfSatisfying(SignalException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ANALYSIS_TIMEOUT));
     }
 
     @Test

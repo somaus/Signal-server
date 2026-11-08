@@ -6,11 +6,13 @@ import com.signal.domain.user.repository.UserRepository;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.file.FileStorage;
+import com.signal.global.util.TransactionUtils;
 import com.signal.domain.websearch.service.WebSearchService;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -25,6 +27,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final FileStorage fileStorage;
     private final WebSearchService webSearchService;
+    private final UserDataEraser userDataEraser;
 
     public User getMyProfile(Long userId) {
         return userRepository.findById(userId)
@@ -42,11 +45,11 @@ public class UserService {
 
     @Transactional
     public void deleteAccount(Long userId) {
-        if (!userRepository.existsById(userId)) {
-            throw new SignalException(ErrorCode.NOT_FOUND);
-        }
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new SignalException(ErrorCode.NOT_FOUND));
         webSearchService.deleteByOwner(userId);
-        userRepository.deleteById(userId);
+        userDataEraser.eraseAll(userId, user.getProfileImageUrl());
+        userRepository.delete(user);
     }
 
     @Transactional
@@ -56,8 +59,13 @@ public class UserService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new SignalException(ErrorCode.NOT_FOUND));
 
+        String previousImageUrl = user.getProfileImageUrl();
         String profileImageUrl = fileStorage.store(image, PROFILE_IMAGE_DIRECTORY);
         user.updateProfileImage(profileImageUrl);
+        if (StringUtils.hasText(previousImageUrl)) {
+            // 바꾸기 전 얼굴 사진이 디스크에 남지 않게 한다.
+            TransactionUtils.runAfterCommit(() -> fileStorage.delete(previousImageUrl));
+        }
 
         return profileImageUrl;
     }

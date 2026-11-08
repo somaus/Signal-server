@@ -14,6 +14,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import lombok.AccessLevel;
@@ -38,12 +39,12 @@ public class RiskAssessment {
     @Column(nullable = false)
     private String imageUrl;
 
+    /** 분석이 끝나기 전(PROCESSING)이나 실패(FAILED)했을 때는 null이다. */
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private RiskLevel overallRiskLevel;
 
-    @Column(nullable = false)
-    private int overallScore;
+    /** 분석이 끝나기 전(PROCESSING)이나 실패(FAILED)했을 때는 null이다. */
+    private Integer overallScore;
 
     @Column(nullable = false)
     private boolean faceDetected;
@@ -71,13 +72,24 @@ public class RiskAssessment {
     @Column(nullable = false)
     private boolean fallbackUsed;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private RiskAssessmentStatus status;
+
+    /** status가 FAILED일 때의 실패 사유. 그 외 상태에서는 null. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 30)
+    private AssessmentFailureReason failureReason;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** status를 주지 않으면 완료된 결과로 만든다(분석이 끝난 뒤 저장하던 기존 방식과 같다). */
     @Builder
     public RiskAssessment(Long userId, String anonymousId, String imageUrl, RiskLevel overallRiskLevel,
-                           int overallScore, boolean faceDetected, List<RiskFactor> factors,
-                           List<String> recommendations, List<DetectedFace> faces, boolean fallbackUsed) {
+                           Integer overallScore, boolean faceDetected, List<RiskFactor> factors,
+                           List<String> recommendations, List<DetectedFace> faces, boolean fallbackUsed,
+                           RiskAssessmentStatus status) {
         this.userId = userId;
         this.anonymousId = anonymousId;
         this.imageUrl = imageUrl;
@@ -88,7 +100,47 @@ public class RiskAssessment {
         this.recommendations = recommendations;
         this.faces = faces;
         this.fallbackUsed = fallbackUsed;
+        this.status = status != null ? status : RiskAssessmentStatus.COMPLETED;
         this.createdAt = LocalDateTime.now();
+    }
+
+    /** 사진을 접수한 직후의 상태. 분석 결과는 비어 있고 {@link #complete} 또는 {@link #fail}로 마무리한다. */
+    public static RiskAssessment processing(Long userId, String anonymousId, String imageUrl) {
+        return RiskAssessment.builder()
+                .userId(userId)
+                .anonymousId(anonymousId)
+                .imageUrl(imageUrl)
+                .faceDetected(false)
+                .factors(new ArrayList<>())
+                .recommendations(new ArrayList<>())
+                .faces(new ArrayList<>())
+                .fallbackUsed(false)
+                .status(RiskAssessmentStatus.PROCESSING)
+                .build();
+    }
+
+    public void complete(RiskLevel overallRiskLevel, int overallScore, boolean faceDetected,
+                         List<RiskFactor> factors, List<String> recommendations, List<DetectedFace> faces,
+                         boolean fallbackUsed) {
+        this.overallRiskLevel = overallRiskLevel;
+        this.overallScore = overallScore;
+        this.faceDetected = faceDetected;
+        replace(this.factors, factors);
+        replace(this.recommendations, recommendations);
+        replace(this.faces, faces);
+        this.fallbackUsed = fallbackUsed;
+        this.status = RiskAssessmentStatus.COMPLETED;
+        this.failureReason = null;
+    }
+
+    public void fail(AssessmentFailureReason failureReason) {
+        this.status = RiskAssessmentStatus.FAILED;
+        this.failureReason = failureReason;
+    }
+
+    private static <T> void replace(List<T> target, List<T> source) {
+        target.clear();
+        target.addAll(source);
     }
 
     public boolean isOwnedBy(Long userId, String anonymousId) {

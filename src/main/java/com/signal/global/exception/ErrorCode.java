@@ -34,6 +34,7 @@ public enum ErrorCode {
     // AI 분석
     FACE_NOT_DETECTED(HttpStatus.UNPROCESSABLE_ENTITY, "얼굴을 검출하지 못했습니다."),
     ANALYSIS_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "현재 이미지를 분석하지 못했습니다. 잠시 후 다시 시도해주세요."),
+    ANALYSIS_TIMEOUT(HttpStatus.GATEWAY_TIMEOUT, "이미지 분석 시간이 초과되었습니다. 잠시 후 다시 시도해주세요."),
     ANONYMOUS_ID_REQUIRED(HttpStatus.BAD_REQUEST, "비로그인 이용을 위해서는 익명 식별자(X-Anonymous-Id)가 필요합니다."),
     ANONYMOUS_DETECTION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "비로그인 체험 가능 횟수를 초과했습니다. 로그인 후 이용해주세요."),
     ANONYMOUS_RISK_ASSESSMENT_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "비로그인 체험 가능 횟수를 초과했습니다. 로그인 후 이용해주세요."),

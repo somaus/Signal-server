@@ -33,11 +33,14 @@ class UserServiceTest {
     @Mock
     private WebSearchService webSearchService;
 
+    @Mock
+    private UserDataEraser userDataEraser;
+
     private UserService userService;
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, fileStorage, webSearchService);
+        userService = new UserService(userRepository, fileStorage, webSearchService, userDataEraser);
     }
 
     @Test
@@ -88,5 +91,44 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.updateProfileImage(1L, image))
                 .isInstanceOf(SignalException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
+    }
+
+    @Test
+    void 회원_탈퇴하면_웹_검색_기록과_모든_기록과_파일을_지우고_계정을_삭제한다() {
+        User user = User.builder().email("test@example.com").password("encoded").name("tester").age(20)
+                .gender(User.Gender.NONE).build();
+        user.updateProfileImage("/uploads/profile/me.png");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+
+        userService.deleteAccount(1L);
+
+        verify(webSearchService).deleteByOwner(1L);
+        verify(userDataEraser).eraseAll(1L, "/uploads/profile/me.png");
+        verify(userRepository).delete(user);
+    }
+
+    @Test
+    void 없는_회원을_탈퇴시키면_NOT_FOUND이고_아무것도_지우지_않는다() {
+        when(userRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> userService.deleteAccount(1L))
+                .isInstanceOf(SignalException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.NOT_FOUND);
+
+        org.mockito.Mockito.verifyNoInteractions(userDataEraser, webSearchService);
+    }
+
+    @Test
+    void 프로필_이미지를_바꾸면_이전_파일을_지운다() {
+        User user = User.builder().email("test@example.com").password("encoded").name("tester").age(20)
+                .gender(User.Gender.NONE).build();
+        user.updateProfileImage("/uploads/profile/old.png");
+        MockMultipartFile image = new MockMultipartFile("image", "profile.png", "image/png", new byte[]{1, 2, 3});
+        when(userRepository.findById(1L)).thenReturn(Optional.of(user));
+        when(fileStorage.store(any(), anyString())).thenReturn("/uploads/profile/new.png");
+
+        userService.updateProfileImage(1L, image);
+
+        verify(fileStorage).delete("/uploads/profile/old.png");
     }
 }

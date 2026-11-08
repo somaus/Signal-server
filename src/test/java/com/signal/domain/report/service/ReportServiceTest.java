@@ -269,4 +269,27 @@ class ReportServiceTest {
                 .isInstanceOf(SignalException.class)
                 .hasFieldOrPropertyWithValue("errorCode", ErrorCode.REPORT_ALREADY_FINALIZED);
     }
+
+    @Test
+    void 신고서를_삭제하면_이_신고서에만_쓴_증거와_문서_파일도_함께_지운다() {
+        Report target = Report.builder().userId(1L).description("설명").sourceUrls(List.of())
+                .evidenceIds(List.of(10L, 11L)).documentUrl("/uploads/reports/target.pdf").build();
+        Report other = Report.builder().userId(1L).description("다른 신고서").sourceUrls(List.of())
+                .evidenceIds(List.of(11L)).documentUrl("/uploads/reports/other.pdf").build();
+        org.springframework.test.util.ReflectionTestUtils.setField(target, "id", 1L);
+        org.springframework.test.util.ReflectionTestUtils.setField(other, "id", 2L);
+        ReportEvidence onlyTarget = ReportEvidence.builder().userId(1L).fileUrl("/uploads/evidences/10.png").build();
+        when(reportRepository.findById(1L)).thenReturn(Optional.of(target));
+        when(reportRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(target, other));
+        // 11번 증거는 다른 신고서도 쓰므로 조회 대상에서 빠져야 한다.
+        when(reportEvidenceRepository.findAllById(java.util.Set.of(10L))).thenReturn(List.of(onlyTarget));
+
+        reportService.deleteReport(1L, 1L);
+
+        verify(reportRepository).delete(target);
+        verify(reportEvidenceRepository).deleteAll(List.of(onlyTarget));
+        verify(fileStorage).delete("/uploads/reports/target.pdf");
+        verify(fileStorage).delete("/uploads/evidences/10.png");
+        verify(fileStorage, never()).delete("/uploads/reports/other.pdf");
+    }
 }

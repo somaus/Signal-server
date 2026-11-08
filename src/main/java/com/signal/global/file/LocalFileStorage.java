@@ -89,6 +89,9 @@ public class LocalFileStorage implements FileStorage {
 
     @Override
     public void delete(String url) {
+        if (url == null || url.isBlank()) {
+            return;
+        }
         String relativePath = url.startsWith(baseUrl + "/") ? url.substring(baseUrl.length() + 1) : url;
         Path target = rootDir.resolve(relativePath).normalize();
         if (!target.startsWith(rootDir)) {
