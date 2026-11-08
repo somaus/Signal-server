@@ -25,7 +25,7 @@ class DeepfakeDetectionResponseTest {
                 List.of(), "/uploads/h.png", "cf", "onnx-fp32+abc",
                 List.of(ProvenanceSignal.GENERATOR_METADATA, ProvenanceSignal.C2PA_MANIFEST));
 
-        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection);
+        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection, null, true);
 
         assertThat(response.band()).isEqualTo("HIGH");
         assertThat(response.assessmentBasis()).isEqualTo("PROVENANCE");
@@ -46,7 +46,7 @@ class DeepfakeDetectionResponseTest {
         detection.completeAssessed(DetectionBand.UNDETERMINED, AssessmentBasis.MODEL, UndeterminedReason.LOW_RESOLUTION,
                 null, null, null, List.of(), "/uploads/h.png", "cf", "v", List.of());
 
-        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection);
+        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection, null, true);
 
         assertThat(response.band()).isEqualTo("UNDETERMINED");
         assertThat(response.undeterminedReason()).isEqualTo("LOW_RESOLUTION");
@@ -59,7 +59,7 @@ class DeepfakeDetectionResponseTest {
         DeepfakeDetection detection = newDetection();
         detection.complete(Verdict.SUSPICIOUS, 0.6, 55, List.of(), "/uploads/h.png", false);
 
-        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection);
+        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection, null, true);
 
         assertThat(response.band()).isNull();
         assertThat(response.modelName()).isNull();
@@ -72,6 +72,6 @@ class DeepfakeDetectionResponseTest {
         DeepfakeDetection detection = DeepfakeDetection.builder().fileUrl("/uploads/a.png").build();
 
         assertThat(DeepfakeDetectionResponse.from(detection, null, true).webSearchAvailable()).isTrue();
-        assertThat(DeepfakeDetectionResponse.from(detection).webSearchAvailable()).isFalse();
+        assertThat(DeepfakeDetectionResponse.from(detection, null, false).webSearchAvailable()).isFalse();
     }
 }

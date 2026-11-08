@@ -37,10 +37,6 @@ public record DeepfakeDetectionResponse(
         boolean webSearchAvailable
 ) {
 
-    public static DeepfakeDetectionResponse from(DeepfakeDetection detection) {
-        return from(detection, null, false);
-    }
-
     /** webSearch가 null이면 웹 검색 기능이 꺼져 있거나 이 탐지에는 검색이 없다(화면은 "준비 중"으로 둔다). */
     public static DeepfakeDetectionResponse from(DeepfakeDetection detection, WebSearch webSearch,
                                                  boolean webSearchAvailable) {
