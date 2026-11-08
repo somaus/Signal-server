@@ -13,10 +13,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class BoundingBox {
 
-    private int x;
-    private int y;
-    private int width;
-    private int height;
+    // 좌표를 모르는 얼굴은 boundingBox 자체가 null이라 저장 컬럼은 비어 있다(primitive면 NOT NULL 컬럼이 된다).
+    private Integer x;
+    private Integer y;
+    private Integer width;
+    private Integer height;
 
     @Builder
     public BoundingBox(int x, int y, int width, int height) {
