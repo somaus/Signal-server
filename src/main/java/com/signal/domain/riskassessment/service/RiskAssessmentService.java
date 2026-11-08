@@ -91,8 +91,12 @@ public class RiskAssessmentService {
         if (!StringUtils.hasText(anonymousId)) {
             throw new SignalException(ErrorCode.ANONYMOUS_ID_REQUIRED);
         }
-        if (riskAssessmentRepository.countByAnonymousIdAndStatusNot(anonymousId, RiskAssessmentStatus.FAILED)
-                >= ANONYMOUS_ASSESSMENT_LIMIT) {
+        // 진행 중인 건도 횟수에 넣어야 동시에 여러 장을 올려 제한을 피하지 못한다.
+        // 다만 서버가 재시작돼 5분이 지나도록 끝나지 않은 건은 조회 전까지 FAILED가 되지 못하므로 뺀다.
+        long used = riskAssessmentRepository.countByAnonymousIdAndStatusNot(anonymousId, RiskAssessmentStatus.FAILED)
+                - riskAssessmentRepository.countByAnonymousIdAndStatusAndCreatedAtBefore(
+                        anonymousId, RiskAssessmentStatus.PROCESSING, LocalDateTime.now().minus(PROCESSING_TIMEOUT));
+        if (used >= ANONYMOUS_ASSESSMENT_LIMIT) {
             throw new SignalException(ErrorCode.ANONYMOUS_RISK_ASSESSMENT_LIMIT_EXCEEDED);
         }
     }

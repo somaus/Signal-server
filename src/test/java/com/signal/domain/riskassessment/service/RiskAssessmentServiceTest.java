@@ -129,6 +129,21 @@ class RiskAssessmentServiceTest {
     }
 
     @Test
+    void 비회원은_5분이_지나도록_끝나지_않은_접수_건을_이용_횟수에서_뺀다() {
+        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", new byte[]{1});
+        when(riskAssessmentRepository.countByAnonymousIdAndStatusNot("anon-1", RiskAssessmentStatus.FAILED))
+                .thenReturn(5L);
+        when(riskAssessmentRepository.countByAnonymousIdAndStatusAndCreatedAtBefore(
+                eq("anon-1"), eq(RiskAssessmentStatus.PROCESSING), any(LocalDateTime.class)))
+                .thenReturn(1L);
+        when(riskAssessmentRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        riskAssessmentService.createAssessment(null, "anon-1", image);
+
+        verify(riskAssessmentRepository).save(any());
+    }
+
+    @Test
     void 지원하지_않는_파일_형식이면_예외가_발생한다() {
         MockMultipartFile file = new MockMultipartFile("image", "malware.exe", "application/octet-stream", new byte[]{1});
 
