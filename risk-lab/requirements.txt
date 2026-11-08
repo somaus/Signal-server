@@ -1,0 +1,7 @@
+# 검증한 버전으로 고정한다. 올릴 때는 tests와 scripts/risk-eval을 다시 돌린다.
+opencv-python-headless==5.0.0.93
+numpy==2.5.4
+pillow==13.0.0
+fastapi==0.162.2
+uvicorn[standard]==0.54.0
+python-multipart==0.0.33
