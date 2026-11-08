@@ -15,6 +15,7 @@ import java.util.List;
  * 화면에는 퍼센트 대신 band를 "합성 가능성" 표현으로 보여 주는 것을 권장한다. band가 점수에서 나오지 않은 경우
  * (UNDETERMINED, assessmentBasis=PROVENANCE)에는 verdict, confidence, riskScore가 null이다.
  * 비전 LLM(mode=llm)이나 이전 기록은 band 등 새 필드가 null이고 provenanceSignals는 빈 목록이다.
+ * webSearchAvailable이 false이면 웹 검색 기능이 꺼져 있다. 화면은 버튼을 누르기 전에 "준비 중"을 보여 줄 수 있다.
  */
 public record DeepfakeDetectionResponse(
         Long detectionId,
@@ -32,15 +33,13 @@ public record DeepfakeDetectionResponse(
         String modelName,
         String modelVersion,
         List<ProvenanceSignalResponse> provenanceSignals,
-        WebSearchResponse webSearch
+        WebSearchResponse webSearch,
+        boolean webSearchAvailable
 ) {
 
-    public static DeepfakeDetectionResponse from(DeepfakeDetection detection) {
-        return from(detection, null);
-    }
-
     /** webSearch가 null이면 웹 검색 기능이 꺼져 있거나 이 탐지에는 검색이 없다(화면은 "준비 중"으로 둔다). */
-    public static DeepfakeDetectionResponse from(DeepfakeDetection detection, WebSearch webSearch) {
+    public static DeepfakeDetectionResponse from(DeepfakeDetection detection, WebSearch webSearch,
+                                                 boolean webSearchAvailable) {
         List<String> codes = detection.getProvenanceSignals() == null ? List.of() : detection.getProvenanceSignals();
         return new DeepfakeDetectionResponse(
                 detection.getId(),
@@ -62,6 +61,7 @@ public record DeepfakeDetectionResponse(
                         .flatMap(java.util.Optional::stream)
                         .map(ProvenanceSignalResponse::from)
                         .toList(),
-                webSearch == null ? null : WebSearchResponse.from(webSearch));
+                webSearch == null ? null : WebSearchResponse.from(webSearch),
+                webSearchAvailable);
     }
 }

@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.signal.domain.riskassessment.dto.response.FaceResponse;
 import com.signal.global.ai.VisionCompletionClient;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
@@ -86,6 +87,25 @@ class LlmRiskAnalyzerTest {
         FaceResponse response = FaceResponse.from(result.faces().get(0));
         assertThat(response.positionKnown()).isFalse();
         assertThat(response.boundingBox()).isNull();
+    }
+
+    @Test
+    void 이미지_픽셀_크기를_읽지_못하면_좌표를_받아도_위치를_비워_둔다() throws IOException {
+        LlmRiskAnalyzer analyzer = new LlmRiskAnalyzer(visionCompletionClient, objectMapper, true);
+        when(visionCompletionClient.complete(any(byte[].class), anyString(), anyString(), anyString()))
+                .thenReturn("""
+                        {"faceDetected": true, "faceBox": {"x":0.2,"y":0.1,"width":0.4,"height":0.5},
+                         "imageQualityScore": 80, "imageQualityNote": "a", "faceExposureScore": 90,
+                         "faceExposureNote": "b", "reverseSearchRiskScore": 30, "reverseSearchRiskNote": "c"}
+                        """);
+        MockMultipartFile unreadable =
+                new MockMultipartFile("image", "broken.png", "image/png", new byte[] {1, 2, 3});
+
+        RiskAnalysisResult result = analyzer.analyze(unreadable);
+
+        assertThat(result.faces()).hasSize(1);
+        assertThat(result.faces().get(0).getBoundingBox()).isNull();
+        assertThat(FaceResponse.from(result.faces().get(0)).positionKnown()).isFalse();
     }
 
     @Test
