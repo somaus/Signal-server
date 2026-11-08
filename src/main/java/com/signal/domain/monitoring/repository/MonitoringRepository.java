@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MonitoringRepository extends JpaRepository<Monitoring, Long> {
 
+    List<Monitoring> findByUserId(Long userId);
+
     List<Monitoring> findByStatusAndNextSearchAtLessThanEqualAndCreatedAtBeforeOrderByNextSearchAtAsc(
             MonitoringStatus status, LocalDateTime now, LocalDateTime createdBefore, Pageable pageable);
 

@@ -12,6 +12,7 @@ import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.file.FileStorage;
 import com.signal.global.file.UploadFileValidator;
+import com.signal.global.util.TransactionUtils;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -100,7 +101,25 @@ public class ReportService {
     @Transactional
     public void deleteReport(Long userId, Long reportId) {
         Report report = getOwnedReport(userId, reportId);
+
+        // 다른 신고서에서도 쓰는 증거는 남기고, 이 신고서에만 연결된 증거와 신고서 파일을 함께 지운다.
+        Set<Long> usedByOthers = new HashSet<>();
+        reportRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
+                .filter(other -> !other.getId().equals(reportId))
+                .forEach(other -> usedByOthers.addAll(other.getEvidenceIds()));
+        Set<Long> onlyThisReport = new HashSet<>(report.getEvidenceIds());
+        onlyThisReport.removeAll(usedByOthers);
+        List<ReportEvidence> evidences = reportEvidenceRepository.findAllById(onlyThisReport).stream()
+                .filter(evidence -> evidence.isOwnedBy(userId))
+                .toList();
+
         reportRepository.delete(report);
+        reportEvidenceRepository.deleteAll(evidences);
+
+        TransactionUtils.runAfterCommit(() -> {
+            fileStorage.delete(report.getDocumentUrl());
+            evidences.forEach(evidence -> fileStorage.delete(evidence.getFileUrl()));
+        });
     }
 
     @Transactional
