@@ -125,9 +125,9 @@ public class RiskAssessment {
         this.overallRiskLevel = overallRiskLevel;
         this.overallScore = overallScore;
         this.faceDetected = faceDetected;
-        replace(this.factors, factors);
-        replace(this.recommendations, recommendations);
-        replace(this.faces, faces);
+        this.factors = replace(this.factors, factors);
+        this.recommendations = replace(this.recommendations, recommendations);
+        this.faces = replace(this.faces, faces);
         this.fallbackUsed = fallbackUsed;
         this.status = RiskAssessmentStatus.COMPLETED;
         this.failureReason = null;
@@ -138,9 +138,15 @@ public class RiskAssessment {
         this.failureReason = failureReason;
     }
 
-    private static <T> void replace(List<T> target, List<T> source) {
+    // 같은 리스트를 다시 넘기거나 builder로 만들어 target이 null이어도 안전하도록 먼저 복사한다.
+    private static <T> List<T> replace(List<T> target, List<T> source) {
+        List<T> copy = source == null ? List.of() : List.copyOf(source);
+        if (target == null) {
+            return new ArrayList<>(copy);
+        }
         target.clear();
-        target.addAll(source);
+        target.addAll(copy);
+        return target;
     }
 
     public boolean isOwnedBy(Long userId, String anonymousId) {

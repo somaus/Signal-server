@@ -53,7 +53,9 @@ public record ConsultationProgress(
                         .findFirst()
                         .orElse(null));
 
-        int percent = (int) Math.round(completed.size() * 100.0 / applicable.size());
+        // 적용 단계가 하나도 없으면 안내할 것이 없는 상태라 100%/COMPLETED로 본다. 지금은 모든 상담 유형에 단계가 있어 닿지 않고,
+        // 0으로 나누지 않으려는 방어다.
+        int percent = applicable.isEmpty() ? 100 : (int) Math.round(completed.size() * 100.0 / applicable.size());
         ConsultationProgressStatus status = completed.size() == applicable.size()
                 ? ConsultationProgressStatus.COMPLETED
                 : ConsultationProgressStatus.IN_PROGRESS;

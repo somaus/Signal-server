@@ -8,6 +8,7 @@ import com.signal.domain.agency.entity.AgencyConnection;
 import com.signal.domain.agency.entity.AgencySituationType;
 import com.signal.domain.agency.service.AgencyService;
 import com.signal.global.i18n.LanguageContext;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -39,7 +40,7 @@ public class AgencyController {
     public ResponseEntity<ConnectionResponse> createConnection(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long agencyId,
-            @RequestBody CreateConnectionRequest request) {
+            @Valid @RequestBody CreateConnectionRequest request) {
         AgencyConnection connection = agencyService.createConnection(
                 userId, agencyId, request.reportId(), request.connectionType());
         return ResponseEntity.status(HttpStatus.CREATED).body(ConnectionResponse.from(connection));
