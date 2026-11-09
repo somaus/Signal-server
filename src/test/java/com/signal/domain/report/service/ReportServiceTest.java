@@ -180,6 +180,7 @@ class ReportServiceTest {
                 .userId(1L).discoveryRoute("지인 제보").damageType("도용").description("원본 설명")
                 .sourceUrls(List.of("https://a")).evidenceIds(List.of()).targetAgencyType("경찰청").build();
         when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(reportRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(reportSummarizer.summarize("수정된 설명", "도용")).thenReturn(Optional.of("새 요약"));
 
         UpdateReportRequest request = new UpdateReportRequest(null, null, null, Optional.of("수정된 설명"), null, null, null, null);
@@ -194,12 +195,28 @@ class ReportServiceTest {
     }
 
     @Test
+    void 피해_유형만_바뀌어도_요약이_다시_만들어진다() {
+        Report report = Report.builder()
+                .userId(1L).damageType("도용").description("원본 설명")
+                .sourceUrls(List.of("https://a")).evidenceIds(List.of()).targetAgencyType("경찰청").build();
+        report.updateSummary("옛 요약");
+        when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(reportRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reportSummarizer.summarize("원본 설명", "얼굴 합성")).thenReturn(Optional.of("새 요약"));
+
+        UpdateReportRequest request = new UpdateReportRequest(null, null, Optional.of("얼굴 합성"), null, null, null, null, null);
+
+        assertThat(reportService.updateReport(1L, 1L, request).getSummary()).isEqualTo("새 요약");
+    }
+
+    @Test
     void 빈_Optional로_보낸_필드는_값이_지워진다() {
         Report report = Report.builder()
                 .userId(1L).discoveryRoute("인스타그램").damageType("도용").description("원본 설명")
                 .sourceUrls(List.of("https://a")).evidenceIds(List.of()).targetAgencyType("경찰청")
                 .additionalNotes("메모").build();
         when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(reportRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdateReportRequest request = new UpdateReportRequest(
                 null, Optional.empty(), null, null, Optional.empty(), null, null, Optional.empty());

@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,7 +41,8 @@ public class ReportService {
     private final ReportPdfRenderer reportPdfRenderer;
     private final FileStorage fileStorage;
 
-    @Transactional
+    // 요약은 외부 LLM 호출(최대 ~15초)이라 DB 커넥션을 쥔 채 기다리지 않도록 트랜잭션 밖에서 만든다.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Report createReport(Long userId, CreateReportRequest request) {
         validateRequired(request.description(), request.sourceUrls());
         validateEvidenceOwnership(userId, request.evidenceIds());
@@ -69,7 +71,7 @@ public class ReportService {
         return reportRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Report updateReport(Long userId, Long reportId, UpdateReportRequest request) {
         Report report = getOwnedReport(userId, reportId);
         validateDraft(report);
@@ -79,17 +81,20 @@ public class ReportService {
         }
 
         boolean descriptionChanged = description != null && !description.equals(report.getDescription());
+        boolean damageTypeChanged = request.getDamageType() != null
+                && !java.util.Objects.equals(request.getDamageType().orElse(null), report.getDamageType());
         report.applyPatch(
                 request.getIncidentDate(), request.getDiscoveryRoute(), request.getDamageType(),
                 description, request.getSourceUrls(), request.getEvidenceIds(),
                 request.getTargetAgencyType(), request.getAdditionalNotes());
-        if (descriptionChanged) {
-            // 원문이 바뀌면 옛 요약이 남지 않게 다시 만든다. 못 만들면 요약 없이 둔다.
+        if (descriptionChanged || damageTypeChanged || report.getSummary() == null) {
+            // 요약 입력(원문·피해 유형)이 바뀌었거나 이전 생성이 실패했으면 다시 만든다. 못 만들면 요약 없이 둔다.
             report.updateSummary(
                     reportSummarizer.summarize(report.getDescription(), report.getDamageType()).orElse(null));
         }
 
-        return report;
+        // shortcut: 조회~저장 사이 동시 PATCH는 마지막 저장이 이긴다(초안 단계라 허용), 충돌이 문제되면 @Version 추가.
+        return reportRepository.save(report);
     }
 
     @Transactional
