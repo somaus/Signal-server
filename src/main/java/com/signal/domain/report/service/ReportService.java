@@ -71,7 +71,7 @@ public class ReportService {
         return reportRepository.findByUserIdOrderByCreatedAtDesc(userId);
     }
 
-    @Transactional
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Report updateReport(Long userId, Long reportId, UpdateReportRequest request) {
         Report report = getOwnedReport(userId, reportId);
         validateDraft(report);
