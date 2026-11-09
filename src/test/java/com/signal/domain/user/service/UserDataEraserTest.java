@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -139,7 +140,7 @@ class UserDataEraserTest {
         verify(fileStorage).delete("/uploads/protections/p.png");
         verify(fileStorage).delete("/uploads/monitoring/m.png");
         verify(fileStorage).delete("/uploads/report-evidences/e.png");
-        verify(fileStorage).delete("/uploads/reports/c.pdf");
+        verify(fileStorage, never()).delete("/uploads/reports/c.pdf");
     }
 
     @Test
