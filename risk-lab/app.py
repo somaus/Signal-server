@@ -11,7 +11,7 @@ from PIL import Image
 from analyzer import FaceAnalyzer, InvalidImage
 
 MAX_BYTES = int(os.environ.get("RISK_MAX_BYTES", 15 * 1024 * 1024))
-MAX_PIXELS = int(os.environ.get("RISK_MAX_PIXELS", 80_000_000))
+MAX_PIXELS = int(os.environ.get("RISK_MAX_PIXELS", 24_000_000))  # 384m 컨테이너에서 원본 해상도 배열 여러 장을 버틸 수 있는 상한
 
 app = FastAPI(title="signal-risk-lab")
 _analyzer = FaceAnalyzer()
