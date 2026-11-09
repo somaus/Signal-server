@@ -53,7 +53,9 @@ public class JwtProvider {
     }
 
     public int getTokenVersion(String token) {
-        return parseClaims(token).get("tokenVersion", Integer.class);
+        Integer version = parseClaims(token).get("tokenVersion", Integer.class);
+        // tokenVersion 클레임이 없는 옛 토큰은 어떤 사용자 버전(0 이상)과도 맞지 않게 해 거부한다.
+        return version == null ? -1 : version;
     }
 
     public boolean validateToken(String token) {
