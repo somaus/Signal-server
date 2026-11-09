@@ -26,7 +26,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 /**
  * 비전 LLM({@link VisionCompletionClient}, 기본 구현은 Groq)으로 실제 이미지를 분석해 위험도를
- * 진단하는 분석기. RiskAnalyzer의 유일한 Spring 빈으로, 기존 StubRiskAnalyzer를 대체한다.
+ * 진단하는 분석기. risk-analysis.mode=llm(기본값)일 때의 RiskAnalyzer 빈이며, http면 HttpRiskAnalyzer가 대신 쓰인다.
  *
  * 안전/정확성을 위한 역할 분담:
  * - 이미지 품질·얼굴 노출도·역검색 노출 위험처럼 실제로 "봐야" 판단할 수 있는 항목은 비전 LLM이 평가한다.
