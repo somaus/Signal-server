@@ -93,7 +93,8 @@ public class ReportService {
                     reportSummarizer.summarize(report.getDescription(), report.getDamageType()).orElse(null));
         }
 
-        return report;
+        // shortcut: 조회~저장 사이 동시 PATCH는 마지막 저장이 이긴다(초안 단계라 허용), 충돌이 문제되면 @Version 추가.
+        return reportRepository.save(report);
     }
 
     @Transactional

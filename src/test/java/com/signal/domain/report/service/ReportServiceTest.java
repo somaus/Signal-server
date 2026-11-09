@@ -180,6 +180,7 @@ class ReportServiceTest {
                 .userId(1L).discoveryRoute("지인 제보").damageType("도용").description("원본 설명")
                 .sourceUrls(List.of("https://a")).evidenceIds(List.of()).targetAgencyType("경찰청").build();
         when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(reportRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(reportSummarizer.summarize("수정된 설명", "도용")).thenReturn(Optional.of("새 요약"));
 
         UpdateReportRequest request = new UpdateReportRequest(null, null, null, Optional.of("수정된 설명"), null, null, null, null);
@@ -200,6 +201,7 @@ class ReportServiceTest {
                 .sourceUrls(List.of("https://a")).evidenceIds(List.of()).targetAgencyType("경찰청")
                 .additionalNotes("메모").build();
         when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(reportRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         UpdateReportRequest request = new UpdateReportRequest(
                 null, Optional.empty(), null, null, Optional.empty(), null, null, Optional.empty());
