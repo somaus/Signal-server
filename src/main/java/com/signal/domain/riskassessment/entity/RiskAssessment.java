@@ -17,6 +17,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import org.hibernate.annotations.Fetch;
+import org.hibernate.annotations.FetchMode;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
@@ -49,18 +51,22 @@ public class RiskAssessment {
     @Column(nullable = false)
     private boolean faceDetected;
 
+    // 컬렉션 3개를 한 번에 조인하면 얼굴×항목×권고 행이 곱해지므로 컬렉션마다 따로 읽는다.
     @ElementCollection(fetch = FetchType.EAGER)
+    @Fetch(FetchMode.SUBSELECT)
     @CollectionTable(name = "risk_assessment_factors", joinColumns = @JoinColumn(name = "risk_assessment_id"))
     @OrderColumn(name = "factor_order")
     private List<RiskFactor> factors;
 
     @ElementCollection(fetch = FetchType.EAGER)
+    @Fetch(FetchMode.SUBSELECT)
     @CollectionTable(name = "risk_assessment_recommendations", joinColumns = @JoinColumn(name = "risk_assessment_id"))
     @OrderColumn(name = "recommendation_order")
     @Column(name = "recommendation", length = 500)
     private List<String> recommendations;
 
     @ElementCollection(fetch = FetchType.EAGER)
+    @Fetch(FetchMode.SUBSELECT)
     @CollectionTable(name = "risk_assessment_faces", joinColumns = @JoinColumn(name = "risk_assessment_id"))
     @OrderColumn(name = "face_order")
     private List<DetectedFace> faces;
