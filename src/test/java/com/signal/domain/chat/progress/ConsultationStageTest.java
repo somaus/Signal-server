@@ -26,4 +26,10 @@ class ConsultationStageTest {
         assertThat(ConsultationStage.EVIDENCE_PRESERVATION.isApplicableTo(null)).isFalse();
         assertThat(ConsultationStage.SITUATION_CHECK.isApplicableTo(null)).isTrue();
     }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.EnumSource(SituationType.class)
+    void 모든_상담_유형에는_적용되는_단계가_하나_이상_있다(SituationType type) {
+        assertThat(ConsultationStage.applicableTo(type)).isNotEmpty();
+    }
 }
