@@ -85,7 +85,7 @@ services:
     profiles: ["risk"]
     build: ./risk-lab
     restart: unless-stopped
-    mem_limit: ${RISK_MEM_LIMIT:-384m}   # 잠정값. 배포 후 docker stats로 조정한다.
+    mem_limit: ${RISK_MEM_LIMIT:-512m}   # 4천만 화소 이미지 처리 시 최대 약 270MB(+기본 60MB)로 쟀다. 잠정값이라 배포 후 docker stats로 조정한다.
     # 포트를 게시하지 않는다(인증이 없으므로 compose 내부망의 app에서만 호출).
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=3)"]
