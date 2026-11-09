@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withBadRequest;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
@@ -163,6 +164,15 @@ class HttpRiskAnalyzerTest {
         assertThatThrownBy(() -> analyzer.analyze(image()))
                 .isInstanceOfSatisfying(SignalException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ANALYSIS_UNAVAILABLE));
+    }
+
+    @Test
+    void 측정_서비스가_이미지를_거절하면_입력_오류로_응답한다() {
+        server.expect(requestTo(URL)).andRespond(withBadRequest());
+
+        assertThatThrownBy(() -> analyzer.analyze(image()))
+                .isInstanceOfSatisfying(SignalException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
     }
 
     @Test
