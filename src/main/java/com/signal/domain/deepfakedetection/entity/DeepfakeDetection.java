@@ -125,7 +125,7 @@ public class DeepfakeDetection {
         this.verdict = verdict;
         this.confidence = confidence;
         this.riskScore = riskScore;
-        this.evidences = evidences;
+        this.evidences = copyOf(evidences);
         this.highlightedResultUrl = highlightedResultUrl;
         this.fallbackUsed = fallbackUsed;
     }
@@ -156,5 +156,10 @@ public class DeepfakeDetection {
     public void fail(DetectionFailureReason failureReason) {
         this.status = DeepfakeDetectionStatus.FAILED;
         this.failureReason = failureReason;
+    }
+
+    // 호출자가 넘긴 불변 리스트(List.of)를 그대로 매핑 컬렉션으로 쓰면 Hibernate가 갱신할 때 실패한다.
+    private static List<Evidence> copyOf(List<Evidence> evidences) {
+        return evidences == null ? new ArrayList<>() : new ArrayList<>(evidences);
     }
 }
