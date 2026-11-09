@@ -58,4 +58,13 @@ class JwtProviderTest {
         assertThat(jwtProvider.validateToken("")).isFalse();
         assertThat(jwtProvider.validateToken(null)).isFalse();
     }
+
+    @Test
+    void tokenVersion_클레임이_없는_토큰은_어떤_버전과도_맞지_않는다() {
+        javax.crypto.SecretKey key = io.jsonwebtoken.security.Keys.hmacShaKeyFor(java.util.Base64.getDecoder().decode(SECRET));
+        String legacy = io.jsonwebtoken.Jwts.builder().subject("1").claim("type", "access")
+                .expiration(new java.util.Date(System.currentTimeMillis() + 60_000)).signWith(key).compact();
+
+        assertThat(jwtProvider.getTokenVersion(legacy)).isEqualTo(-1);
+    }
 }
