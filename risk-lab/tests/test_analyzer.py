@@ -78,3 +78,13 @@ def test_실제_얼굴_사진에서_얼굴을_찾는다():
     assert len(result["faces"]) >= 1
     face = result["faces"][0]
     assert 0 < face["areaRatio"] <= 1 and 0 <= face["frontal"] <= 1
+
+
+def test_이미지_밖에서_시작하는_박스는_이미지_안으로_제한된다():
+    gray = np.full((200, 200), 128, dtype=np.uint8)
+    r = np.zeros(15, dtype=np.float32)
+    r[:4] = [250, 150, 80, 80]  # 오른쪽 가장자리 밖에서 시작해 아래로도 넘치는 박스
+    r[4:6] = [260, 170]; r[6:8] = [290, 170]; r[8:10] = [275, 190]; r[14] = 0.9
+    face = FaceAnalyzer._measure(r, 1.0, 200, 200, gray)
+    assert face.x < 200 and face.x + face.width <= 200
+    assert face.y + face.height <= 200
