@@ -71,13 +71,25 @@ class AuthControllerTest {
 
     @Test
     void 로그인에_성공하면_토큰을_반환한다() throws Exception {
-        when(authService.login(any())).thenReturn(new TokenResponse("at", "rt", 3600L));
+        when(authService.login(any(), any())).thenReturn(new TokenResponse("at", "rt", 3600L));
 
         postJson("/api/v1/auth/login", "{\"email\":\"a@b.com\",\"password\":\"pw\"}")
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.accessToken").value("at"))
                 .andExpect(jsonPath("$.refreshToken").value("rt"))
                 .andExpect(jsonPath("$.accessTokenExpiresIn").value(3600));
+    }
+
+    @Test
+    void 로그인할_때_익명_식별자_헤더를_서비스에_넘긴다() throws Exception {
+        when(authService.login(any(), any())).thenReturn(new TokenResponse("at", "rt", 3600L));
+
+        mockMvc.perform(post("/api/v1/auth/login").header("X-Anonymous-Id", "anon-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"a@b.com\",\"password\":\"pw\"}"))
+                .andExpect(status().isOk());
+
+        verify(authService).login(any(), org.mockito.ArgumentMatchers.eq("anon-1"));
     }
 
     @Test
@@ -92,7 +104,7 @@ class AuthControllerTest {
 
     @Test
     void 로그인_실패는_401_LOGIN_FAILED다() throws Exception {
-        when(authService.login(any())).thenThrow(new SignalException(ErrorCode.LOGIN_FAILED));
+        when(authService.login(any(), any())).thenThrow(new SignalException(ErrorCode.LOGIN_FAILED));
 
         postJson("/api/v1/auth/login", "{\"email\":\"a@b.com\",\"password\":\"pw\"}")
                 .andExpect(status().isUnauthorized())

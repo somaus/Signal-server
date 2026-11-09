@@ -9,6 +9,7 @@ import com.signal.domain.auth.entity.RefreshToken;
 import com.signal.domain.auth.repository.RefreshTokenRepository;
 import com.signal.domain.user.entity.User;
 import com.signal.domain.user.repository.UserRepository;
+import com.signal.domain.user.service.AnonymousRecordClaimer;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.security.jwt.JwtProvider;
@@ -31,6 +32,7 @@ public class AuthService {
     private final JwtProvider jwtProvider;
     private final VerificationService verificationService;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final AnonymousRecordClaimer anonymousRecordClaimer;
 
     @Value("${jwt.access-token-expiration}")
     private long accessTokenExpiration;
@@ -41,6 +43,12 @@ public class AuthService {
 
     @Transactional
     public TokenResponse login(LoginRequest request) {
+        return login(request, null);
+    }
+
+    /** anonymousId가 있으면 그 식별자로 쌓인 비회원 기록을 이 계정으로 옮긴다(#74). */
+    @Transactional
+    public TokenResponse login(LoginRequest request, String anonymousId) {
         User user = userRepository.findByEmail(normalize(request.email()))
                 .orElseThrow(() -> new SignalException(ErrorCode.LOGIN_FAILED));
 
@@ -48,6 +56,7 @@ public class AuthService {
             throw new SignalException(ErrorCode.LOGIN_FAILED);
         }
 
+        anonymousRecordClaimer.claim(user.getId(), anonymousId);
         return issueTokens(user, UUID.randomUUID().toString());
     }
 
