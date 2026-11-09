@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
@@ -21,13 +22,16 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDFont;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
+import org.apache.fontbox.ttf.TTFParser;
+import org.apache.fontbox.ttf.TrueTypeFont;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 /**
  * 신고서 내용으로 신고 문서(PDF)를 만든다. 한글 표시를 위해 나눔고딕(SIL OFL 1.1)을 PDF에 포함한다.
- * 문서에 쓰이는 글꼴 파일은 한 번만 읽어 두고, 문서마다 쓰이는 글자만 골라 담는다.
+ * 글꼴 파일은 시작할 때 한 번만 읽어 파싱해 두고(요청마다 파싱하지 않는다), 문서마다 쓰이는 글자만 골라 담는다.
+ * 파싱한 글꼴은 여러 요청이 함께 쓰기에 안전하지 않으므로 문서를 만드는 동안은 잠금을 잡는다(문서 한 장에 수십 ms).
  *
  * 문서는 신고서 내용을 정리한 신고 보조 자료다. 접수 기관 고유의 양식이 아니며, 요약은 AI가 만들어
  * 원문과 다를 수 있으므로 원문(피해 내용)을 그대로 함께 싣는다.
@@ -45,18 +49,20 @@ public class ReportPdfRenderer {
     private static final float LEADING = 17f;
     private static final float LABEL_WIDTH = 96f;
 
-    private final byte[] regularFont;
-    private final byte[] boldFont;
+    private final TrueTypeFont regularFont;
+    private final TrueTypeFont boldFont;
+    private final ReentrantLock renderLock = new ReentrantLock();
 
     public ReportPdfRenderer() {
-        this.regularFont = readResource(REGULAR_FONT);
-        this.boldFont = readResource(BOLD_FONT);
+        this.regularFont = parseFont(REGULAR_FONT);
+        this.boldFont = parseFont(BOLD_FONT);
     }
 
     public byte[] render(Report report) {
+        renderLock.lock();
         try (PDDocument document = new PDDocument()) {
-            PDFont regular = PDType0Font.load(document, new ByteArrayInputStream(regularFont));
-            PDFont bold = PDType0Font.load(document, new ByteArrayInputStream(boldFont));
+            PDFont regular = PDType0Font.load(document, regularFont, true);
+            PDFont bold = PDType0Font.load(document, boldFont, true);
             Page page = new Page(document, regular, bold);
 
             writeHeader(page, report);
@@ -88,6 +94,8 @@ public class ReportPdfRenderer {
         } catch (IOException e) {
             log.error("신고 문서 PDF 생성 실패: reportId={}", report.getId(), e);
             throw new SignalException(ErrorCode.INTERNAL_SERVER_ERROR);
+        } finally {
+            renderLock.unlock();
         }
     }
 
@@ -115,7 +123,7 @@ public class ReportPdfRenderer {
             page.paragraph("-", page.regular, BODY_SIZE, 0);
         }
         for (int i = 0; i < urls.size(); i++) {
-            page.paragraph((i + 1) + ". " + urls.get(i), page.regular, BODY_SIZE, 0);
+            page.numbered((i + 1) + ".", urls.get(i));
         }
         page.space(8);
     }
@@ -138,9 +146,9 @@ public class ReportPdfRenderer {
         return StringUtils.hasText(value) ? value : "-";
     }
 
-    private static byte[] readResource(String path) {
+    private static TrueTypeFont parseFont(String path) {
         try (InputStream in = new ClassPathResource(path).getInputStream()) {
-            return in.readAllBytes();
+            return new TTFParser().parse(new ByteArrayInputStream(in.readAllBytes()));
         } catch (IOException e) {
             throw new IllegalStateException("PDF 글꼴을 읽을 수 없습니다: " + path, e);
         }
@@ -169,7 +177,7 @@ public class ReportPdfRenderer {
         }
 
         void heading(String text) throws IOException {
-            ensureSpace(LEADING * 2);
+            ensureSpace(LEADING * 4);   // 제목만 페이지 아래에 남지 않게, 뒤따르는 글 두 줄 정도가 들어갈 자리를 함께 확인한다
             paragraph(text, bold, 12.5f, 0, 20f);
             line();
         }
@@ -182,6 +190,19 @@ public class ReportPdfRenderer {
             for (String line : valueLines) {
                 ensureSpace(LEADING);
                 writeLine(line, regular, BODY_SIZE, MARGIN + LABEL_WIDTH, y);
+                y -= LEADING;
+            }
+        }
+
+        /** 번호를 왼쪽에 두고 내용은 들여쓴 채 줄바꿈한다. 긴 주소가 나뉘어도 번호가 홀로 한 줄에 남지 않는다. */
+        void numbered(String number, String text) throws IOException {
+            float indent = 22f;
+            List<String> lines = wrap(text, regular, BODY_SIZE, contentWidth - indent);
+            ensureSpace(LEADING);
+            writeLine(number, regular, BODY_SIZE, MARGIN, y);
+            for (String line : lines) {
+                ensureSpace(LEADING);
+                writeLine(line, regular, BODY_SIZE, MARGIN + indent, y);
                 y -= LEADING;
             }
         }
@@ -272,6 +293,12 @@ public class ReportPdfRenderer {
                         if (cp == ' ') {
                             i += Character.charCount(cp);
                             continue;
+                        }
+                        // 단어 단위로 넘겨 받은 앞부분에 이 글자까지 이으면 또 넘칠 수 있다. 그때는 여기서 줄을 닫는다.
+                        if (currentWidth + w > maxWidth && current.length() > 0) {
+                            lines.add(current.toString().stripTrailing());
+                            current = new StringBuilder();
+                            currentWidth = 0;
                         }
                     }
                     if (cp == ' ') {
