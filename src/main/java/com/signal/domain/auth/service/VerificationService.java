@@ -57,8 +57,9 @@ public class VerificationService {
         // 검사와 기록을 compute 안에서 함께 해 동시 요청이 한도를 넘지 못하게 한다. 예외가 나면 기록은 바뀌지 않는다.
         sends.compute(key, (k, times) -> {
             Deque<Long> recent = times == null ? new ArrayDeque<>() : times;
-            if (!recent.isEmpty() && now - recent.peekLast() < RESEND_COOLDOWN_MS
-                    || recent.size() >= MAX_SENDS_PER_WINDOW) {
+            boolean withinCooldown = !recent.isEmpty() && now - recent.peekLast() < RESEND_COOLDOWN_MS;
+            boolean overLimit = recent.size() >= MAX_SENDS_PER_WINDOW;
+            if (withinCooldown || overLimit) {
                 throw new SignalException(ErrorCode.VERIFICATION_TOO_FREQUENT);
             }
             recent.addLast(now);
@@ -66,8 +67,19 @@ public class VerificationService {
         });
 
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
-        codes.put(key, new CodeEntry(code, now, now + codeExpiration, 0));
-        mailService.sendVerificationCode(email.trim(), code);
+        CodeEntry entry = new CodeEntry(code, now, now + codeExpiration, 0);
+        codes.put(key, entry);
+        try {
+            mailService.sendVerificationCode(email.trim(), code);
+        } catch (RuntimeException e) {
+            // 메일이 실제로 나가지 않았으면 사용자가 대기시간과 발송 횟수를 잃지 않게 방금 기록한 것을 되돌린다.
+            codes.remove(key, entry);
+            sends.computeIfPresent(key, (k, times) -> {
+                times.removeLastOccurrence(now);
+                return times.isEmpty() ? null : times;
+            });
+            throw e;
+        }
         return codeExpiration / 1000;
     }
 

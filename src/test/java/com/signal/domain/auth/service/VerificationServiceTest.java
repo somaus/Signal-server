@@ -6,6 +6,7 @@ import static org.mockito.ArgumentCaptor.forClass;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -174,5 +175,20 @@ class VerificationServiceTest {
         assertErrorCode(() -> verificationService.sendCode(EMAIL, Purpose.SIGNUP), ErrorCode.VERIFICATION_TOO_FREQUENT);
 
         verify(mailService, times(0)).sendVerificationCode(eq(EMAIL), anyString());
+    }
+
+    @Test
+    void 메일_발송이_실패하면_대기시간과_발송_횟수를_소진하지_않는다() {
+        doThrow(new IllegalStateException("SMTP 오류")).doNothing()
+                .when(mailService).sendVerificationCode(eq(EMAIL), anyString());
+
+        assertThatThrownBy(() -> verificationService.sendCode(EMAIL, Purpose.SIGNUP))
+                .isInstanceOf(IllegalStateException.class);
+
+        Map<String, Deque<Long>> sends = (Map<String, Deque<Long>>) ReflectionTestUtils.getField(verificationService, "sends");
+        assertThat(sends).doesNotContainKey("SIGNUP:" + EMAIL);
+        // 대기시간 없이 바로 다시 요청할 수 있다
+        verificationService.sendCode(EMAIL, Purpose.SIGNUP);
+        verify(mailService, times(2)).sendVerificationCode(eq(EMAIL), anyString());
     }
 }
