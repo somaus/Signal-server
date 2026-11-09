@@ -79,12 +79,13 @@ class FaceAnalyzer:
         img = decode(data)
         width, height = img.size
         rgb = np.asarray(img)
-        bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
         gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
 
         scale = min(1.0, MAX_DETECT_EDGE / max(width, height))
-        det_bgr = bgr if scale == 1.0 else cv2.resize(
-            bgr, (round(width * scale), round(height * scale)), interpolation=cv2.INTER_AREA)
+        # 검출에는 축소본만 쓰므로 원본 크기 BGR 사본을 만들지 않는다.
+        det_rgb = rgb if scale == 1.0 else cv2.resize(
+            rgb, (round(width * scale), round(height * scale)), interpolation=cv2.INTER_AREA)
+        det_bgr = cv2.cvtColor(det_rgb, cv2.COLOR_RGB2BGR)
         dh, dw = det_bgr.shape[:2]
         detector = cv2.FaceDetectorYN.create(self._model_path, "", (dw, dh), SCORE_THRESHOLD, 0.3, 5000)
         _, raw = detector.detect(det_bgr)
