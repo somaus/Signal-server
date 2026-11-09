@@ -53,7 +53,7 @@ public record ConsultationProgress(
                         .findFirst()
                         .orElse(null));
 
-        int percent = (int) Math.round(completed.size() * 100.0 / applicable.size());
+        int percent = applicable.isEmpty() ? 100 : (int) Math.round(completed.size() * 100.0 / applicable.size());
         ConsultationProgressStatus status = completed.size() == applicable.size()
                 ? ConsultationProgressStatus.COMPLETED
                 : ConsultationProgressStatus.IN_PROGRESS;
