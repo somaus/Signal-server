@@ -108,8 +108,11 @@ class FaceAnalyzer:
     @staticmethod
     def _measure(row: np.ndarray, scale: float, width: int, height: int, gray: np.ndarray) -> Face:
         x, y, w, h = (float(v) / scale for v in row[:4])
-        x0, y0 = max(0, int(round(x))), max(0, int(round(y)))
-        x1, y1 = min(width, int(round(x + w))), min(height, int(round(y + h)))
+        # 박스가 이미지 밖에서 시작해도 최소 1px은 이미지 안에 남도록 양쪽으로 제한한다.
+        x0 = min(width - 1, max(0, int(round(x))))
+        y0 = min(height - 1, max(0, int(round(y))))
+        x1 = max(x0 + 1, min(width, int(round(x + w))))
+        y1 = max(y0 + 1, min(height, int(round(y + h))))
         bw, bh = max(1, x1 - x0), max(1, y1 - y0)
         # landmarks: 오른쪽 눈, 왼쪽 눈, 코끝, 오른쪽 입꼬리, 왼쪽 입꼬리 (이미지 기준 좌표)
         lm = row[4:14].reshape(5, 2) / scale
