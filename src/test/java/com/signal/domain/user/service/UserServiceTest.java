@@ -1,5 +1,6 @@
 package com.signal.domain.user.service;
 
+import com.signal.global.file.TestFileBytes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -52,7 +53,7 @@ class UserServiceTest {
                 .age(20)
                 .gender(User.Gender.NONE)
                 .build();
-        MockMultipartFile image = new MockMultipartFile("image", "profile.png", "image/png", new byte[]{1, 2, 3});
+        MockMultipartFile image = new MockMultipartFile("image", "profile.png", "image/png", TestFileBytes.PNG);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(fileStorage.store(any(), anyString())).thenReturn("/uploads/profile/generated.png");
@@ -85,7 +86,7 @@ class UserServiceTest {
 
     @Test
     void 존재하지_않는_유저면_예외가_발생한다() {
-        MockMultipartFile image = new MockMultipartFile("image", "profile.jpg", "image/jpeg", new byte[]{1, 2, 3});
+        MockMultipartFile image = new MockMultipartFile("image", "profile.jpg", "image/jpeg", TestFileBytes.JPEG);
         when(userRepository.findById(1L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> userService.updateProfileImage(1L, image))
@@ -123,7 +124,7 @@ class UserServiceTest {
         User user = User.builder().email("test@example.com").password("encoded").name("tester").age(20)
                 .gender(User.Gender.NONE).build();
         user.updateProfileImage("/uploads/profile/old.png");
-        MockMultipartFile image = new MockMultipartFile("image", "profile.png", "image/png", new byte[]{1, 2, 3});
+        MockMultipartFile image = new MockMultipartFile("image", "profile.png", "image/png", TestFileBytes.PNG);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
         when(fileStorage.store(any(), anyString())).thenReturn("/uploads/profile/new.png");
 

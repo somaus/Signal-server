@@ -1,5 +1,6 @@
 package com.signal.domain.riskassessment.service;
 
+import com.signal.global.file.TestFileBytes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -81,7 +82,7 @@ class RiskAssessmentServiceTest {
 
     @Test
     void 위험도_진단을_요청하면_PROCESSING으로_접수되고_분석은_백그라운드로_넘어간다() {
-        byte[] bytes = new byte[]{1, 2, 3};
+        byte[] bytes = TestFileBytes.PNG;
         MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", bytes);
         when(fileStorage.store(any(MockMultipartFile.class), anyString()))
                 .thenReturn("/uploads/risk-assessments/generated.png");
@@ -105,7 +106,7 @@ class RiskAssessmentServiceTest {
 
     @Test
     void 비회원은_익명_식별자가_없으면_접수되지_않고_분석도_시작되지_않는다() {
-        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", new byte[]{1});
+        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", TestFileBytes.PNG);
 
         assertThatThrownBy(() -> riskAssessmentService.createAssessment(null, " ", image))
                 .isInstanceOf(SignalException.class)
@@ -116,7 +117,7 @@ class RiskAssessmentServiceTest {
 
     @Test
     void 비회원은_실패한_분석을_이용_횟수에서_제외하고_센다() {
-        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", new byte[]{1});
+        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", TestFileBytes.PNG);
         when(riskAssessmentRepository.countByAnonymousIdAndStatusNot("anon-1", RiskAssessmentStatus.FAILED))
                 .thenReturn(5L);
 
@@ -130,7 +131,7 @@ class RiskAssessmentServiceTest {
 
     @Test
     void 비회원은_5분이_지나도록_끝나지_않은_접수_건을_이용_횟수에서_뺀다() {
-        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", new byte[]{1});
+        MockMultipartFile image = new MockMultipartFile("image", "photo.png", "image/png", TestFileBytes.PNG);
         when(riskAssessmentRepository.countByAnonymousIdAndStatusNot("anon-1", RiskAssessmentStatus.FAILED))
                 .thenReturn(5L);
         when(riskAssessmentRepository.countByAnonymousIdAndStatusAndCreatedAtBefore(
