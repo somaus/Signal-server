@@ -93,7 +93,6 @@ public class UserDataEraser {
         reportEvidenceRepository.deleteAll(evidences);
 
         List<AgencyConnection> connections = agencyConnectionRepository.findByUserId(userId);
-        connections.forEach(connection -> add(files, connection.getAttachedReportUrl()));
         agencyConnectionRepository.deleteAll(connections);
 
         List<ChatSession> sessions = chatSessionRepository.findByUserIdOrderByCreatedAtDesc(userId);
