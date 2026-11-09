@@ -145,7 +145,7 @@ public class DeepfakeDetection {
         this.verdict = verdict;
         this.confidence = confidence;
         this.riskScore = riskScore;
-        this.evidences = evidences;
+        this.evidences = copyOf(evidences);
         this.highlightedResultUrl = highlightedResultUrl;
         this.fallbackUsed = false;
         this.modelName = modelName;
