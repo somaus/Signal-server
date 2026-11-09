@@ -34,6 +34,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.ResultActions;
 
 /** reissue 경로는 AuthControllerReissueTest에서 다룬다. */
 @WebMvcTest(AuthController.class)
@@ -61,7 +62,7 @@ class AuthControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
-    private org.springframework.test.web.servlet.ResultActions postJson(String url, String body) throws Exception {
+    private ResultActions postJson(String url, String body) throws Exception {
         return mockMvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(body));
     }
 
