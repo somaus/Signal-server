@@ -95,3 +95,27 @@ def test_잘린_이미지는_InvalidImage():
 def test_픽셀_수_한도를_넘으면_ImageTooLarge():
     with pytest.raises(ImageTooLarge):
         load_image(png_bytes(Image.new("RGB", (100, 100))), max_pixels=9_999)
+
+
+def test_픽셀_수가_한도와_같으면_통과한다():
+    assert load_image(png_bytes(Image.new("RGB", (100, 100))), max_pixels=10_000).size == (100, 100)
+
+
+def test_빈_바이트는_InvalidImage():
+    with pytest.raises(InvalidImage):
+        load_image(b"")
+
+
+def test_투명_PNG는_알파를_버리고_RGB로_읽는다():
+    # risk-lab과 달리 흰 배경 합성 없이 알파만 버린다(투명 픽셀의 RGB 값이 그대로 남는다).
+    img = load_image(png_bytes(Image.new("RGBA", (4, 4), (1, 2, 3, 0))))
+    assert img.mode == "RGB" and img.getpixel((0, 0)) == (1, 2, 3)
+
+
+def test_EXIF_회전은_적용하지_않는다():
+    src = Image.new("RGB", (200, 100), (10, 20, 30))
+    exif = src.getexif()
+    exif[0x0112] = 6
+    buf = io.BytesIO()
+    src.save(buf, "JPEG", exif=exif)
+    assert load_image(buf.getvalue()).size == (200, 100)
