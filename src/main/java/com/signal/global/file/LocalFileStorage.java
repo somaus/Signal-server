@@ -6,8 +6,8 @@ import jakarta.annotation.PostConstruct;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Pattern;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -16,8 +16,6 @@ import org.springframework.web.multipart.MultipartFile;
 @Slf4j
 @Component
 public class LocalFileStorage implements FileStorage {
-
-    private static final Pattern SAFE_EXTENSION = Pattern.compile("\\.[A-Za-z0-9]{1,10}");
 
     private final Path rootDir;
     private final String baseUrl;
@@ -40,7 +38,7 @@ public class LocalFileStorage implements FileStorage {
 
     @Override
     public String store(MultipartFile file, String directory) {
-        String filename = UUID.randomUUID() + extractExtension(file.getOriginalFilename());
+        String filename = UUID.randomUUID() + extension(UploadFileType.detect(file));
         Path target = resolveTarget(directory, filename);
 
         try {
@@ -56,7 +54,7 @@ public class LocalFileStorage implements FileStorage {
 
     @Override
     public String store(byte[] content, String originalFilename, String directory) {
-        String filename = UUID.randomUUID() + extractExtension(originalFilename);
+        String filename = UUID.randomUUID() + extension(UploadFileType.detect(content));
         Path target = resolveTarget(directory, filename);
 
         try {
@@ -118,16 +116,8 @@ public class LocalFileStorage implements FileStorage {
         return baseUrl + "/" + directory + "/" + filename;
     }
 
-    private String extractExtension(String originalFilename) {
-        if (originalFilename == null) {
-            return "";
-        }
-        int dotIndex = originalFilename.lastIndexOf('.');
-        if (dotIndex < 0) {
-            return "";
-        }
-        // 확장자는 사용자 입력이므로 경로 구분자 등이 섞이지 않도록 영숫자만 허용한다.
-        String extension = originalFilename.substring(dotIndex);
-        return SAFE_EXTENSION.matcher(extension).matches() ? extension : "";
+    // 확장자는 클라이언트 파일명이 아니라 확인된 형식에서만 정한다. 알 수 없는 형식은 저장하지 않는다.
+    private String extension(Optional<UploadFileType> type) {
+        return "." + type.orElseThrow(() -> new SignalException(ErrorCode.UNSUPPORTED_MEDIA_TYPE)).extension();
     }
 }
