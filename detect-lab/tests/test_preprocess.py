@@ -119,3 +119,13 @@ def test_EXIF_회전은_적용하지_않는다():
     buf = io.BytesIO()
     src.save(buf, "JPEG", exif=exif)
     assert load_image(buf.getvalue()).size == (200, 100)
+
+
+def test_극단적으로_가는_이미지는_리사이즈_전에_거부한다():
+    import io as _io
+    from PIL import Image as _Image
+    from preprocess import ImageTooLarge, load_image
+    buf = _io.BytesIO()
+    _Image.new("RGB", (1, 50_000)).save(buf, "PNG")
+    with pytest.raises(ImageTooLarge):
+        load_image(buf.getvalue())
