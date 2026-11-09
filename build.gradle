@@ -46,6 +46,11 @@ dependencies {
     // 이미지 EXIF 메타데이터(GPS 등) 판독 - 위험도 분석의 메타데이터 노출 항목에 사용
     implementation 'com.drewnoakes:metadata-extractor:2.21.0'
 
+    // 신고 문서(PDF) 생성. 2.0.x 계열(보안 수정이 이어지는 안정판)을 쓰고, 로깅은 Spring의 spring-jcl이 맡는다.
+    implementation('org.apache.pdfbox:pdfbox:2.0.32') {
+        exclude group: 'commons-logging', module: 'commons-logging'
+    }
+
     // Lombok
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'

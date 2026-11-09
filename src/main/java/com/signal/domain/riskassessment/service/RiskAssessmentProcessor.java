@@ -39,15 +39,21 @@ public class RiskAssessmentProcessor {
             }
             markCompleted(assessmentId, result);
         } catch (SignalException e) {
-            AssessmentFailureReason reason = e.getErrorCode() == ErrorCode.ANALYSIS_TIMEOUT
-                    ? AssessmentFailureReason.TIMEOUT
-                    : AssessmentFailureReason.AI_SERVER_ERROR;
+            AssessmentFailureReason reason = failureReasonOf(e.getErrorCode());
             log.warn("위험도 분석 실패: assessmentId={}, reason={}", assessmentId, reason, e);
             markFailed(assessmentId, reason);
         } catch (Exception e) {
             log.error("위험도 분석 중 예상하지 못한 오류: assessmentId={}", assessmentId, e);
             markFailed(assessmentId, AssessmentFailureReason.AI_SERVER_ERROR);
         }
+    }
+
+    private static AssessmentFailureReason failureReasonOf(ErrorCode errorCode) {
+        return switch (errorCode) {
+            case ANALYSIS_TIMEOUT -> AssessmentFailureReason.TIMEOUT;
+            case FILE_TOO_LARGE, UNSUPPORTED_MEDIA_TYPE -> AssessmentFailureReason.INVALID_IMAGE;
+            default -> AssessmentFailureReason.AI_SERVER_ERROR;
+        };
     }
 
     private void markCompleted(Long assessmentId, RiskAnalysisResult result) {

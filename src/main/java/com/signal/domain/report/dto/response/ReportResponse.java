@@ -2,7 +2,7 @@ package com.signal.domain.report.dto.response;
 
 import com.signal.domain.report.entity.Report;
 import com.signal.domain.report.entity.ReportStatus;
-import com.signal.domain.report.generator.StubReportDocumentGenerator;
+import com.signal.domain.report.service.ReportDocuments;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,18 +14,17 @@ public record ReportResponse(
         String discoveryRoute,
         String damageType,
         String description,
+        String summary,
         List<String> sourceUrls,
         List<Long> evidenceIds,
         String targetAgencyType,
         String additionalNotes,
         String documentUrl,
-        boolean documentSimulated,
         List<TimelineEntryResponse> timeline,
         LocalDateTime createdAt
 ) {
 
     public static ReportResponse from(Report report) {
-        boolean documentSimulated = StubReportDocumentGenerator.isSimulatedUrl(report.getDocumentUrl());
         return new ReportResponse(
                 report.getId(),
                 report.getStatus(),
@@ -33,12 +32,12 @@ public record ReportResponse(
                 report.getDiscoveryRoute(),
                 report.getDamageType(),
                 report.getDescription(),
+                report.getSummary(),
                 report.getSourceUrls(),
                 report.getEvidenceIds(),
                 report.getTargetAgencyType(),
                 report.getAdditionalNotes(),
-                documentSimulated ? null : report.getDocumentUrl(),
-                documentSimulated,
+                ReportDocuments.pathFor(report.getId()),
                 report.getTimeline().stream().map(TimelineEntryResponse::from).toList(),
                 report.getCreatedAt());
     }
