@@ -1,6 +1,5 @@
 package com.signal.domain.agency.controller;
 
-import jakarta.validation.Valid;
 import com.signal.domain.agency.dto.request.CreateConnectionRequest;
 import com.signal.domain.agency.dto.response.AgencyListResponse;
 import com.signal.domain.agency.dto.response.ConnectionResponse;
@@ -9,6 +8,7 @@ import com.signal.domain.agency.entity.AgencyConnection;
 import com.signal.domain.agency.entity.AgencySituationType;
 import com.signal.domain.agency.service.AgencyService;
 import com.signal.global.i18n.LanguageContext;
+import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
