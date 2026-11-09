@@ -40,6 +40,31 @@ def test_투명_PNG는_흰_배경에_합성해_읽는다():
     assert decoded.getpixel((0, 0)) == (255, 255, 255)
 
 
+def test_팔레트와_LA_이미지도_흰_배경에_합성한다():
+    pal = Image.new("P", (10, 10), 0)
+    pal.putpalette([0, 0, 0] * 256)
+    pal.info["transparency"] = 0
+    la = Image.new("LA", (10, 10), (0, 0))
+    for img in (pal, la):
+        decoded, size = decode(png(img))
+        assert decoded.mode == "RGB" and size == (10, 10)
+        assert decoded.getpixel((0, 0)) == (255, 255, 255)
+
+
+def test_불투명한_픽셀은_색을_유지하고_반투명은_흰색과_섞인다():
+    img = Image.new("RGBA", (2, 1))
+    img.putpixel((0, 0), (10, 20, 30, 255))
+    img.putpixel((1, 0), (0, 0, 0, 128))
+    decoded, _ = decode(png(img))
+    assert decoded.getpixel((0, 0)) == (10, 20, 30)
+    assert all(120 <= c <= 135 for c in decoded.getpixel((1, 0)))
+
+
+def test_흑백_이미지는_RGB로_읽는다():
+    decoded, _ = decode(png(Image.new("L", (8, 6), 77)))
+    assert decoded.mode == "RGB" and decoded.getpixel((0, 0)) == (77, 77, 77)
+
+
 def test_EXIF_회전을_반영한_크기를_쓴다():
     img = Image.new("RGB", (200, 100), (10, 20, 30))
     exif = img.getexif()
