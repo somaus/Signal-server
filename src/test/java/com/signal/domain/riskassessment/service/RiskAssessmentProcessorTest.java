@@ -142,6 +142,17 @@ class RiskAssessmentProcessorTest {
     }
 
     @Test
+    void 이미지가_거절되면_INVALID_IMAGE로_실패_처리한다() {
+        when(riskAnalyzer.analyze(any(MultipartFile.class)))
+                .thenThrow(new SignalException(ErrorCode.INVALID_INPUT));
+
+        processor.process(7L, "photo.png", "image/png", CONTENT);
+
+        assertThat(assessment.getStatus()).isEqualTo(RiskAssessmentStatus.FAILED);
+        assertThat(assessment.getFailureReason()).isEqualTo(AssessmentFailureReason.INVALID_IMAGE);
+    }
+
+    @Test
     void 예상하지_못한_오류도_AI_SERVER_ERROR로_실패_처리한다() {
         when(riskAnalyzer.analyze(any(MultipartFile.class))).thenThrow(new IllegalStateException("boom"));
 
