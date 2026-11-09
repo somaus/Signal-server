@@ -6,6 +6,8 @@ import com.signal.global.mail.MailService;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -30,6 +32,8 @@ public class VerificationService {
 
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final long RESEND_COOLDOWN_MS = 30_000;   // 같은 주소로 메일 폭탄을 보내지 못하게 하는 재발송 간격
+    private static final long SEND_WINDOW_MS = 3_600_000;   // 발송 횟수를 세는 구간(1시간)
+    private static final int MAX_SENDS_PER_WINDOW = 5;   // 구간 내 주소별 최대 발송 횟수
     private static final int MAX_FAILED_ATTEMPTS = 5;   // 6자리 숫자 무차별 대입 방지
 
     private final MailService mailService;
@@ -41,6 +45,8 @@ public class VerificationService {
     private long tokenExpiration;
 
     private final Map<String, CodeEntry> codes = new ConcurrentHashMap<>();
+    /** 주소별 발송 시각. 오답으로 인증번호가 폐기돼도 남겨 재발송 간격과 횟수 제한이 풀리지 않게 한다. */
+    private final Map<String, Deque<Long>> sends = new ConcurrentHashMap<>();
     private final Map<String, TokenEntry> tokens = new ConcurrentHashMap<>();
 
     /** 인증번호 생성·저장 후 메일 발송. 유효시간(초) 반환 */
@@ -48,10 +54,16 @@ public class VerificationService {
         purgeExpired();
         String key = key(email, purpose);
         long now = now();
-        CodeEntry previous = codes.get(key);
-        if (previous != null && now - previous.sentAt() < RESEND_COOLDOWN_MS) {
-            throw new SignalException(ErrorCode.VERIFICATION_TOO_FREQUENT);
-        }
+        // 검사와 기록을 compute 안에서 함께 해 동시 요청이 한도를 넘지 못하게 한다. 예외가 나면 기록은 바뀌지 않는다.
+        sends.compute(key, (k, times) -> {
+            Deque<Long> recent = times == null ? new ArrayDeque<>() : times;
+            if (!recent.isEmpty() && now - recent.peekLast() < RESEND_COOLDOWN_MS
+                    || recent.size() >= MAX_SENDS_PER_WINDOW) {
+                throw new SignalException(ErrorCode.VERIFICATION_TOO_FREQUENT);
+            }
+            recent.addLast(now);
+            return recent;
+        });
 
         String code = String.format("%06d", RANDOM.nextInt(1_000_000));
         codes.put(key, new CodeEntry(code, now, now + codeExpiration, 0));
@@ -105,6 +117,12 @@ public class VerificationService {
         long now = now();
         codes.values().removeIf(entry -> now > entry.expiresAt());
         tokens.values().removeIf(entry -> now > entry.expiresAt());
+        for (String k : sends.keySet()) {
+            sends.computeIfPresent(k, (key, times) -> {
+                times.removeIf(t -> now - t >= SEND_WINDOW_MS);
+                return times.isEmpty() ? null : times;
+            });
+        }
     }
 
     /** 실패 횟수가 한도에 도달하면 인증번호를 폐기해 재발송 없이는 더 시도할 수 없게 한다. */

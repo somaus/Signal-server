@@ -13,6 +13,9 @@ import com.signal.domain.auth.service.VerificationService.Purpose;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.mail.MailService;
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -147,5 +150,29 @@ class VerificationServiceTest {
         String token = verificationService.verifyCode("  " + EMAIL.toUpperCase() + " ", code, Purpose.SIGNUP);
 
         verificationService.consumeToken(token, EMAIL, Purpose.SIGNUP);   // 예외 없이 통과
+    }
+
+    @Test
+    void 오답으로_인증번호가_폐기돼도_재발송_대기시간은_유지된다() {
+        String code = sendAndCaptureCode(Purpose.SIGNUP);
+        String wrong = code.equals("000000") ? "000001" : "000000";
+        for (int i = 0; i < 5; i++) {
+            assertErrorCode(() -> verificationService.verifyCode(EMAIL, wrong, Purpose.SIGNUP), ErrorCode.CODE_MISMATCH);
+        }
+
+        assertErrorCode(() -> verificationService.sendCode(EMAIL, Purpose.SIGNUP), ErrorCode.VERIFICATION_TOO_FREQUENT);
+
+        verify(mailService, times(1)).sendVerificationCode(eq(EMAIL), anyString());
+    }
+
+    @Test
+    void 구간_내_발송_횟수가_한도에_도달하면_대기시간이_지나도_거부한다() {
+        Map<String, Deque<Long>> sends = (Map<String, Deque<Long>>) ReflectionTestUtils.getField(verificationService, "sends");
+        long past = System.currentTimeMillis() - 60_000;   // 대기시간은 지났고 구간 안
+        sends.put("SIGNUP:" + EMAIL, new ArrayDeque<>(List.of(past, past, past, past, past)));
+
+        assertErrorCode(() -> verificationService.sendCode(EMAIL, Purpose.SIGNUP), ErrorCode.VERIFICATION_TOO_FREQUENT);
+
+        verify(mailService, times(0)).sendVerificationCode(eq(EMAIL), anyString());
     }
 }
