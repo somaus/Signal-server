@@ -129,3 +129,16 @@ def test_극단적으로_가는_이미지는_리사이즈_전에_거부한다():
     _Image.new("RGB", (1, 50_000)).save(buf, "PNG")
     with pytest.raises(ImageTooLarge):
         load_image(buf.getvalue())
+
+
+def test_리사이즈_후_한도는_원본_한도와_따로_적용된다():
+    # 100x100(1만 픽셀)은 원본 한도를 통과하지만 짧은 변 440으로 늘린 결과(19.4만 픽셀)는 전용 한도를 넘는다
+    img = png_bytes(Image.new("RGB", (100, 100)))
+    with pytest.raises(ImageTooLarge):
+        load_image(img, max_resized_pixels=150_000)
+    assert load_image(img, max_resized_pixels=200_000).size == (100, 100)
+
+
+def test_넓은_파노라마는_리사이즈_후_한도_안이면_받는다():
+    # 리사이즈하면 8800x440(약 3.9MP)이라 한도 안이다
+    assert load_image(png_bytes(Image.new("RGB", (10_000, 500)))).size == (10_000, 500)
