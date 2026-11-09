@@ -20,7 +20,28 @@ def test_목표_크기는_짧은_변을_440으로_맞추고_긴_변을_내림한
     assert target_size(100, 100) == (440, 440)   # 작은 이미지는 키운다
 
 
+def test_목표_크기는_극단적인_비율에서도_짧은_변이_440이다():
+    assert target_size(1, 3) == (440, 1320)
+    assert target_size(441, 440) == (441, 440)   # int(440 * 441 / 440) = 441
+    assert target_size(439, 440) == (440, 441)   # int(440 * 440 / 439) = int(441.002)
+
+
+@pytest.mark.parametrize("size", [(1, 1), (5, 3), (384, 384), (385, 1000), (3000, 17)])
+def test_아주_작거나_홀수인_크기도_384_정사각으로_나온다(size):
+    out = preprocess(Image.new("RGB", size, (10, 20, 30)))
+    assert out.shape == (1, 3, CROP, CROP)
+    expected = (np.array([10, 20, 30], dtype=np.float32) / 255.0 - MEAN) / STD
+    assert np.allclose(out[0, :, 0, 0], expected, atol=1e-5)
+
+
+@pytest.mark.parametrize("mode,color", [("L", 77), ("P", 0), ("CMYK", (0, 0, 0, 0))])
+def test_RGB가_아닌_모드도_preprocess가_변환한다(mode, color):
+    out = preprocess(Image.new(mode, (50, 50), color))
+    assert out.shape == (1, 3, CROP, CROP) and out.dtype == np.float32
+
+
 def test_출력_형태와_자료형():
+
     out = preprocess(Image.new("RGB", (640, 480), (10, 20, 30)))
     assert out.shape == (1, 3, CROP, CROP)
     assert out.dtype == np.float32
