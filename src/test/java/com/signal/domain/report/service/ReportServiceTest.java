@@ -3,6 +3,8 @@ package com.signal.domain.report.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
@@ -23,9 +25,11 @@ import com.signal.global.file.FileStorage;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -47,12 +51,16 @@ class ReportServiceTest {
     @Mock
     private FileStorage fileStorage;
 
+    @Mock
+    private PlatformTransactionManager transactionManager;
+
     private ReportService reportService;
 
     @BeforeEach
     void setUp() {
         reportService = new ReportService(
-                reportRepository, reportEvidenceRepository, reportSummarizer, reportPdfRenderer, fileStorage);
+                reportRepository, reportEvidenceRepository, reportSummarizer, reportPdfRenderer, fileStorage,
+                transactionManager);
     }
 
     private CreateReportRequest sampleRequest() {
@@ -332,5 +340,135 @@ class ReportServiceTest {
                 null, null, null, Optional.of("바뀐 설명"), null, null, null, null));
 
         assertThat(report.getSummary()).isNull();
+    }
+
+    @Test
+    void 요약_LLM_호출은_쓰기_트랜잭션을_열기_전에_끝난다() {
+        when(reportSummarizer.summarize(any(), any())).thenReturn(Optional.of("요약"));
+        when(reportRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(reportEvidenceRepository.findAllById(any())).thenReturn(List.of(
+                ReportEvidence.builder().userId(1L).fileUrl("/uploads/a.png").build(),
+                ReportEvidence.builder().userId(1L).fileUrl("/uploads/b.png").build()));
+
+        reportService.createReport(1L, sampleRequest());
+
+        InOrder order = inOrder(reportSummarizer, transactionManager, reportRepository);
+        order.verify(reportSummarizer).summarize(any(), any());
+        order.verify(transactionManager).getTransaction(any());
+        order.verify(reportRepository).save(any());
+    }
+
+    @Test
+    void 수정할_때도_요약_호출은_트랜잭션_밖에서_먼저_한다() {
+        Report report = Report.builder().userId(1L).description("원본 설명").damageType("도용")
+                .sourceUrls(List.of("https://a")).evidenceIds(List.of()).build();
+        when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(reportSummarizer.summarize("바뀐 설명", "도용")).thenReturn(Optional.of("새 요약"));
+
+        reportService.updateReport(1L, 1L, new UpdateReportRequest(
+                null, null, null, Optional.of("바뀐 설명"), null, null, null, null));
+
+        InOrder order = inOrder(reportSummarizer, transactionManager);
+        order.verify(reportSummarizer).summarize("바뀐 설명", "도용");
+        order.verify(transactionManager).getTransaction(any());
+    }
+
+    @Test
+    void 피해_유형만_바뀌어도_요약을_다시_만든다() {
+        Report report = Report.builder().userId(1L).description("원본 설명").damageType("도용")
+                .sourceUrls(List.of("https://a")).evidenceIds(List.of()).build();
+        report.updateSummary("옛 요약");
+        when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(reportSummarizer.summarize("원본 설명", "합성")).thenReturn(Optional.of("합성 기준 요약"));
+
+        reportService.updateReport(1L, 1L, new UpdateReportRequest(
+                null, null, Optional.of("합성"), null, null, null, null, null));
+
+        assertThat(report.getDamageType()).isEqualTo("합성");
+        assertThat(report.getSummary()).isEqualTo("합성 기준 요약");
+    }
+
+    @Test
+    void 피해_유형을_지우면_지운_상태로_요약을_다시_만든다() {
+        Report report = Report.builder().userId(1L).description("원본 설명").damageType("도용")
+                .sourceUrls(List.of("https://a")).evidenceIds(List.of()).build();
+        report.updateSummary("옛 요약");
+        when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(reportSummarizer.summarize("원본 설명", null)).thenReturn(Optional.empty());
+
+        reportService.updateReport(1L, 1L, new UpdateReportRequest(
+                null, null, Optional.empty(), null, null, null, null, null));
+
+        assertThat(report.getDamageType()).isNull();
+        assertThat(report.getSummary()).isNull();
+    }
+
+    @Test
+    void 생성할_때_요약을_못_만들었으면_다음_수정에서_다시_시도한다() {
+        Report report = Report.builder().userId(1L).description("원본 설명").damageType("도용")
+                .sourceUrls(List.of("https://a")).evidenceIds(List.of()).build();   // 요약 없음
+        when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(reportSummarizer.summarize("원본 설명", "도용")).thenReturn(Optional.of("뒤늦게 만든 요약"));
+
+        reportService.updateReport(1L, 1L, new UpdateReportRequest(
+                null, null, null, null, null, null, null, Optional.of("메모만 바꿈")));
+
+        assertThat(report.getSummary()).isEqualTo("뒤늦게 만든 요약");
+    }
+
+    @Test
+    void 요약을_만드는_사이_원문이_바뀌었으면_맞지_않는_요약을_붙이지_않는다() {
+        Report report = Report.builder().userId(1L).description("원본 설명").damageType("도용")
+                .sourceUrls(List.of("https://a")).evidenceIds(List.of()).build();
+        when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        // 요약을 만드는 중(LLM 호출 중)에 다른 요청이 원문을 바꾼 상황
+        when(reportSummarizer.summarize(anyString(), any())).thenAnswer(invocation -> {
+            org.springframework.test.util.ReflectionTestUtils.setField(report, "description", "다른 요청이 바꾼 설명");
+            return Optional.of("옛 입력으로 만든 요약");
+        });
+
+        reportService.updateReport(1L, 1L, new UpdateReportRequest(
+                null, null, null, null, null, null, null, Optional.of("메모만 바꿈")));
+
+        assertThat(report.getSummary()).isNull();
+    }
+
+    @Test
+    void 작성_완료할_때_요약이_비어_있으면_한_번_더_만든다() {
+        Report report = Report.builder().userId(1L).description("원본 설명").damageType("도용")
+                .sourceUrls(List.of("https://a")).evidenceIds(List.of()).build();
+        when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(reportSummarizer.summarize("원본 설명", "도용")).thenReturn(Optional.of("마지막에 만든 요약"));
+
+        Report finalized = reportService.finalizeReport(1L, 1L);
+
+        assertThat(finalized.getStatus()).isEqualTo(ReportStatus.FINALIZED);
+        assertThat(finalized.getSummary()).isEqualTo("마지막에 만든 요약");
+    }
+
+    @Test
+    void 작성_완료할_때_요약이_이미_있으면_다시_만들지_않는다() {
+        Report report = Report.builder().userId(1L).description("원본 설명").damageType("도용")
+                .sourceUrls(List.of("https://a")).evidenceIds(List.of()).build();
+        report.updateSummary("기존 요약");
+        when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+
+        reportService.finalizeReport(1L, 1L);
+
+        assertThat(report.getSummary()).isEqualTo("기존 요약");
+        verify(reportSummarizer, never()).summarize(any(), any());
+    }
+
+    @Test
+    void 작성_완료할_때_요약을_또_못_만들어도_작성_완료는_된다() {
+        Report report = Report.builder().userId(1L).description("원본 설명").damageType("도용")
+                .sourceUrls(List.of("https://a")).evidenceIds(List.of()).build();
+        when(reportRepository.findById(1L)).thenReturn(Optional.of(report));
+        when(reportSummarizer.summarize("원본 설명", "도용")).thenReturn(Optional.empty());
+
+        Report finalized = reportService.finalizeReport(1L, 1L);
+
+        assertThat(finalized.getStatus()).isEqualTo(ReportStatus.FINALIZED);
+        assertThat(finalized.getSummary()).isNull();
     }
 }

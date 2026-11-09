@@ -95,4 +95,19 @@ class LlmReportSummarizerTest {
         assertThat(summarizer(true).summarize(LONG_TEXT, null)).isEmpty();
         assertThat(summarizer(true).summarize(LONG_TEXT, null)).isEmpty();
     }
+
+    @Test
+    void 길이_제한으로_자를_때_이모지의_한가운데서_자르지_않는다() {
+        String text = "가".repeat(9) + "😀" + "나나나";   // 😀는 서로게이트 쌍으로 인덱스 9, 10
+
+        String truncated = LlmReportSummarizer.truncate(text, 10);
+
+        assertThat(truncated).isEqualTo("가".repeat(9));
+        assertThat(Character.isHighSurrogate(truncated.charAt(truncated.length() - 1))).isFalse();
+    }
+
+    @Test
+    void 길이_제한_안이면_그대로_둔다() {
+        assertThat(LlmReportSummarizer.truncate("짧은 요약", 100)).isEqualTo("짧은 요약");
+    }
 }

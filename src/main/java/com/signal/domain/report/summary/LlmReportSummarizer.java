@@ -81,9 +81,18 @@ public class LlmReportSummarizer implements ReportSummarizer {
             return Optional.empty();
         }
         String text = summary.asText().strip();
-        if (text.length() > MAX_SUMMARY_LENGTH) {
-            text = text.substring(0, MAX_SUMMARY_LENGTH).strip();
+        return Optional.of(truncate(text, MAX_SUMMARY_LENGTH));
+    }
+
+    /** 길이 제한에 맞춰 자른다. 이모지 같은 서로게이트 쌍의 한가운데서 자르지 않는다. */
+    static String truncate(String text, int maxLength) {
+        if (text.length() <= maxLength) {
+            return text;
         }
-        return Optional.of(text);
+        int end = maxLength;
+        if (Character.isHighSurrogate(text.charAt(end - 1))) {
+            end--;
+        }
+        return text.substring(0, end).strip();
     }
 }
