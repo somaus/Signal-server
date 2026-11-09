@@ -39,6 +39,7 @@ public enum ErrorCode {
     ANONYMOUS_DETECTION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "비로그인 체험 가능 횟수를 초과했습니다. 로그인 후 이용해주세요."),
     ANONYMOUS_RISK_ASSESSMENT_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "비로그인 체험 가능 횟수를 초과했습니다. 로그인 후 이용해주세요."),
     ANONYMOUS_CHAT_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "비로그인 체험 가능 횟수를 초과했습니다. 로그인 후 이용해주세요."),
+    ANONYMOUS_IP_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도하거나 로그인 후 이용해주세요."),
 
     // 이미지 보호
     PROTECTION_NOT_READY(HttpStatus.CONFLICT, "이미지 보호 처리가 아직 완료되지 않았습니다."),
