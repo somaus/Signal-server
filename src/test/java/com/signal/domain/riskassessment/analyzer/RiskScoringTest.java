@@ -65,4 +65,27 @@ class RiskScoringTest {
         assertThat(RiskScoring.imageQuality(f)).isEqualTo(RiskScoring.imageQuality(f));
         assertThat(RiskScoring.faceExposure(f)).isEqualTo(RiskScoring.faceExposure(f));
     }
+
+    @Test
+    void 종합은_품질_40_노출도_40_메타데이터_20의_가중_합이다() {
+        assertThat(RiskScoring.overall(100, 100, 100)).isEqualTo(100);
+        assertThat(RiskScoring.overall(0, 0, 0)).isZero();
+        assertThat(RiskScoring.overall(100, 0, 0)).isEqualTo(40);
+        assertThat(RiskScoring.overall(0, 100, 0)).isEqualTo(40);
+        assertThat(RiskScoring.overall(0, 0, 100)).isEqualTo(20);
+        assertThat(RiskScoring.overall(60, 80, 10)).isEqualTo(58);   // 24 + 32 + 2
+    }
+
+    @Test
+    void 위치_정보가_없어도_얼굴_기반_두_항목이_충분히_높으면_높음_구간에_닿는다() {
+        // 평균이었다면 (100 + 100 + 10) / 3 = 70이 한계였다. 가중 합에서는 두 항목이 85면 이미 70을 넘는다.
+        assertThat(RiskScoring.overall(85, 85, 10)).isGreaterThanOrEqualTo(70);
+        assertThat(RiskScoring.overall(100, 100, 10)).isEqualTo(82);
+    }
+
+    @Test
+    void 종합은_0에서_100을_벗어나지_않는다() {
+        assertThat(RiskScoring.overall(500, 500, 500)).isEqualTo(100);
+        assertThat(RiskScoring.overall(-50, -50, -50)).isZero();
+    }
 }

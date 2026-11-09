@@ -19,6 +19,12 @@ final class RiskScoring {
     static final double AREA_LOW = 0.005;
     static final double AREA_HIGH = 0.15;
 
+    // 종합 점수의 항목 가중치. 위치 정보(GPS)가 없을 때 고정 10점인 메타데이터 항목이 얼굴 기반 점수를 끌어내려
+    // 종합이 HIGH(70)에 닿지 못하는 일이 없도록 얼굴 기반 두 항목에 더 큰 가중치를 둔다.
+    private static final double QUALITY_OVERALL_WEIGHT = 0.4;
+    private static final double EXPOSURE_OVERALL_WEIGHT = 0.4;
+    private static final double METADATA_OVERALL_WEIGHT = 0.2;
+
     private static final double RESOLUTION_WEIGHT = 0.6;
     private static final double SHARPNESS_WEIGHT = 0.4;
     private static final double AREA_WEIGHT = 0.5;
@@ -39,6 +45,14 @@ final class RiskScoring {
         double area = logScale(face.areaRatio(), AREA_LOW, AREA_HIGH);
         double frontal = clamp01(face.frontal() == null ? 0 : face.frontal());
         return toScore(AREA_WEIGHT * area + FRONTAL_WEIGHT * frontal);
+    }
+
+    /** 종합 점수 = 이미지 품질 40% + 얼굴 노출도 40% + 메타데이터 노출 20%. */
+    static int overall(int imageQuality, int faceExposure, int metadataLeak) {
+        double weighted = QUALITY_OVERALL_WEIGHT * imageQuality
+                + EXPOSURE_OVERALL_WEIGHT * faceExposure
+                + METADATA_OVERALL_WEIGHT * metadataLeak;
+        return (int) Math.round(Math.max(0, Math.min(100, weighted)));
     }
 
     /** value가 low 이하면 0, high 이상이면 1, 그 사이는 로그 눈금으로 보간한다. 값이 없거나 0 이하면 0. */

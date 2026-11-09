@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import com.signal.domain.riskassessment.entity.RiskFactor;
@@ -19,6 +20,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -87,14 +89,15 @@ class HttpRiskAnalyzerTest {
     }
 
     @Test
-    void 종합_점수는_항목_점수의_평균이고_등급과_권고가_따라온다() {
+    void 종합_점수는_항목_가중_합이고_등급과_권고가_따라온다() {
         server.expect(requestTo(URL)).andRespond(withSuccess(ONE_FACE, MediaType.APPLICATION_JSON));
 
         RiskAnalysisResult result = analyzer.analyze(image());
 
-        int avg = (int) Math.round(result.factors().stream().mapToInt(RiskFactor::getScore).average().orElse(0));
-        assertThat(result.overallScore()).isEqualTo(avg);
-        assertThat(result.overallRiskLevel()).isEqualTo(RiskLevel.fromScore(avg));
+        int expected = RiskScoring.overall(factor(result, "IMAGE_QUALITY").getScore(),
+                factor(result, "FACE_EXPOSURE").getScore(), factor(result, "METADATA_LEAK").getScore());
+        assertThat(result.overallScore()).isEqualTo(expected);
+        assertThat(result.overallRiskLevel()).isEqualTo(RiskLevel.fromScore(expected));
         assertThat(result.recommendations()).isNotEmpty();
     }
 
@@ -133,7 +136,7 @@ class HttpRiskAnalyzerTest {
     }
 
     @Test
-    void 여러_얼굴은_큰_순서로_최대_10개까지_돌려주고_항목은_가장_높은_얼굴_기준이다() {
+    void 여러_얼굴은_받은_그대로_큰_순서로_돌려주고_항목은_가장_높은_얼굴_기준이다() {
         StringBuilder faces = new StringBuilder();
         for (int i = 0; i < 12; i++) {
             int size = 40 + i * 10;   // 마지막(i=11)이 가장 크다
@@ -144,16 +147,70 @@ class HttpRiskAnalyzerTest {
                     .formatted(i, size, size, size));
         }
         server.expect(requestTo(URL)).andRespond(withSuccess(
-                "{\"model\":\"yunet\",\"modelVersion\":\"2023mar\",\"faces\":[" + faces + "]}", MediaType.APPLICATION_JSON));
+                "{\"model\":\"yunet\",\"modelVersion\":\"2023mar\",\"faceCount\":12,\"faces\":[" + faces + "]}",
+                MediaType.APPLICATION_JSON));
 
         RiskAnalysisResult result = analyzer.analyze(image());
 
-        assertThat(result.faces()).hasSize(HttpRiskAnalyzer.MAX_FACES);
+        // 개수 제한은 risk-lab에서만 한다. 서버는 받은 얼굴을 모두 돌려준다.
+        assertThat(result.faces()).hasSize(12);
         assertThat(result.faces().get(0).getBoundingBox().getWidth()).isEqualTo(150);
         assertThat(result.faces().get(0).getFaceIndex()).isZero();
-        assertThat(result.faces().get(9).getBoundingBox().getWidth()).isEqualTo(60);
         assertThat(factor(result, "IMAGE_QUALITY").getDescription()).contains("150px");
         assertThat(factor(result, "FACE_EXPOSURE").getDescription()).contains("12개");
+    }
+
+    @Test
+    void 얼굴_수_상한으로_일부만_왔어도_검출한_전체_수를_설명에_쓴다() {
+        server.expect(requestTo(URL)).andRespond(withSuccess(
+                """
+                {"model":"yunet","modelVersion":"2023mar","faceCount":18,
+                 "faces":[{"box":{"x":1,"y":1,"width":50,"height":50},"confidence":0.9,"areaRatio":0.01,
+                           "facePx":50,"sharpness":100,"frontal":0.5}]}
+                """, MediaType.APPLICATION_JSON));
+
+        RiskAnalysisResult result = analyzer.analyze(image());
+
+        assertThat(result.faces()).hasSize(1);
+        assertThat(factor(result, "FACE_EXPOSURE").getDescription()).contains("18개");
+    }
+
+    @Test
+    void 얼굴이_선명하고_크고_정면이면_위치_정보가_없어도_종합이_높음에_닿는다() {
+        server.expect(requestTo(URL)).andRespond(withSuccess(ONE_FACE, MediaType.APPLICATION_JSON));
+
+        RiskAnalysisResult result = analyzer.analyze(image());
+
+        assertThat(factor(result, "METADATA_LEAK").getScore()).isEqualTo(10);
+        assertThat(result.overallScore()).isGreaterThanOrEqualTo(70);
+        assertThat(result.overallRiskLevel()).isEqualTo(RiskLevel.HIGH);
+    }
+
+    @Test
+    void 측정_서비스가_이미지를_읽지_못하면_다시_시도하라는_서버_오류가_아니라_파일_형식_오류로_구분한다() {
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.BAD_REQUEST));
+
+        assertThatThrownBy(() -> analyzer.analyze(image()))
+                .isInstanceOfSatisfying(SignalException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
+    }
+
+    @Test
+    void 측정_서비스가_해상도_초과로_거절하면_파일_크기_오류로_구분한다() {
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.PAYLOAD_TOO_LARGE));
+
+        assertThatThrownBy(() -> analyzer.analyze(image()))
+                .isInstanceOfSatisfying(SignalException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.FILE_TOO_LARGE));
+    }
+
+    @Test
+    void 측정_서비스가_바쁘다고_하면_분석하지_못함으로_응답한다() {
+        server.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+
+        assertThatThrownBy(() -> analyzer.analyze(image()))
+                .isInstanceOfSatisfying(SignalException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.ANALYSIS_UNAVAILABLE));
     }
 
     @Test

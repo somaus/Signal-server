@@ -131,6 +131,27 @@ class RiskAssessmentProcessorTest {
     }
 
     @Test
+    void 이미지_자체가_거절되면_다시_시도해도_같으므로_INVALID_IMAGE로_실패_처리한다() {
+        when(riskAnalyzer.analyze(any(MultipartFile.class)))
+                .thenThrow(new SignalException(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
+
+        processor.process(7L, "photo.png", "image/png", CONTENT);
+
+        assertThat(assessment.getStatus()).isEqualTo(RiskAssessmentStatus.FAILED);
+        assertThat(assessment.getFailureReason()).isEqualTo(AssessmentFailureReason.INVALID_IMAGE);
+    }
+
+    @Test
+    void 해상도나_용량_초과로_거절돼도_INVALID_IMAGE로_실패_처리한다() {
+        when(riskAnalyzer.analyze(any(MultipartFile.class)))
+                .thenThrow(new SignalException(ErrorCode.FILE_TOO_LARGE));
+
+        processor.process(7L, "photo.png", "image/png", CONTENT);
+
+        assertThat(assessment.getFailureReason()).isEqualTo(AssessmentFailureReason.INVALID_IMAGE);
+    }
+
+    @Test
     void 분석_시간이_초과되면_TIMEOUT으로_실패_처리한다() {
         when(riskAnalyzer.analyze(any(MultipartFile.class)))
                 .thenThrow(new SignalException(ErrorCode.ANALYSIS_TIMEOUT));
