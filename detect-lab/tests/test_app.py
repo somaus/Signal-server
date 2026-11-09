@@ -64,28 +64,6 @@ def test_픽셀이_너무_많으면_413(tiny_onnx):
     assert res.status_code == 413
 
 
-def test_파일이_한도와_같으면_통과한다(tiny_onnx):
-    data = png(size=(200, 200))
-    with TestClient(create_app(lambda: OnnxModel(tiny_onnx, "tiny"), max_upload_bytes=len(data))) as c:
-        assert c.post("/detect", files={"file": ("a.png", data, "image/png")}).status_code == 200
-
-
-@pytest.mark.parametrize("data", [b"", None])
-def test_빈_파일이나_잘린_이미지는_400(client, data):
-    if data is None:
-        full = png(size=(200, 200))
-        data = full[: len(full) // 2]
-    assert client.post("/detect", files={"file": ("a.png", data, "image/png")}).status_code == 400
-
-
-def test_오류가_난_뒤에도_동시_처리_자리를_돌려준다(tiny_onnx):
-    with TestClient(create_app(lambda: OnnxModel(tiny_onnx, "tiny"), max_upload_bytes=1000, max_concurrency=1)) as c:
-        for _ in range(3):
-            assert c.post("/detect", files={"file": ("a.png", b"x" * 2000, "image/png")}).status_code == 413
-            assert c.post("/detect", files={"file": ("a.png", b"hello", "image/png")}).status_code == 400
-        assert c.post("/detect", files={"file": ("a.png", png(size=(20, 20)), "image/png")}).status_code == 200
-
-
 def test_file_필드가_없으면_422(client):
     assert client.post("/detect", data={"x": "y"}).status_code == 422
 

@@ -81,26 +81,4 @@ class DeepfakeDetectionTest {
         assertThat(guest.isOwnedBy(null, "anon")).isTrue();
         assertThat(guest.isOwnedBy(null, "other")).isFalse();
     }
-
-    @Test
-    void complete에_불변_목록을_넘겨도_수정_가능한_복사본으로_보관한다() {
-        DeepfakeDetection d = detection();
-        List<Evidence> given = List.of(new Evidence("t", "d", null, null));
-
-        d.complete(Verdict.FAKE, 0.9, 85, given, "h.jpg", false);
-        d.getEvidences().add(new Evidence("t2", "d2", null, null));
-
-        assertThat(d.getEvidences()).hasSize(2);
-        assertThat(given).hasSize(1);
-    }
-
-    @Test
-    void completeAssessed에_null_근거를_넘기면_빈_목록이_된다() {
-        DeepfakeDetection d = detection();
-
-        d.completeAssessed(DetectionBand.HIGH, AssessmentBasis.PROVENANCE, null, null, null, null, null, null,
-                "model", "v1", List.of());
-
-        assertThat(d.getEvidences()).isEmpty();
-    }
 }

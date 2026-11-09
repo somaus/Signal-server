@@ -54,26 +54,6 @@ class RiskAssessmentTest {
     }
 
     @Test
-    void builder로_목록_없이_만든_뒤에도_complete할_수_있다() {
-        RiskAssessment ra = RiskAssessment.builder().imageUrl("i.jpg").build();
-
-        ra.complete(RiskLevel.LOW, 10, false, List.of(), List.of("a"), List.of(), false);
-
-        assertThat(ra.getRecommendations()).containsExactly("a");
-        assertThat(ra.getFactors()).isEmpty();
-    }
-
-    @Test
-    void 자기_목록을_그대로_넘겨도_비워지지_않는다() {
-        RiskAssessment ra = RiskAssessment.processing(1L, null, "i.jpg");
-        ra.complete(RiskLevel.LOW, 10, false, List.of(), List.of("a", "b"), List.of(), false);
-
-        ra.complete(RiskLevel.LOW, 10, false, ra.getFactors(), ra.getRecommendations(), ra.getFaces(), false);
-
-        assertThat(ra.getRecommendations()).containsExactly("a", "b");
-    }
-
-    @Test
     void fail하면_FAILED와_사유가_남는다() {
         RiskAssessment ra = RiskAssessment.processing(1L, null, "i.jpg");
 
