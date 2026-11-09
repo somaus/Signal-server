@@ -40,6 +40,31 @@ def test_투명_PNG는_흰_배경에_합성해_읽는다():
     assert decoded.getpixel((0, 0)) == (255, 255, 255)
 
 
+def test_팔레트와_LA_이미지도_흰_배경에_합성한다():
+    pal = Image.new("P", (10, 10), 0)
+    pal.putpalette([0, 0, 0] * 256)
+    pal.info["transparency"] = 0
+    la = Image.new("LA", (10, 10), (0, 0))
+    for img in (pal, la):
+        decoded, size = decode(png(img))
+        assert decoded.mode == "RGB" and size == (10, 10)
+        assert decoded.getpixel((0, 0)) == (255, 255, 255)
+
+
+def test_불투명한_픽셀은_색을_유지하고_반투명은_흰색과_섞인다():
+    img = Image.new("RGBA", (2, 1))
+    img.putpixel((0, 0), (10, 20, 30, 255))
+    img.putpixel((1, 0), (0, 0, 0, 128))
+    decoded, _ = decode(png(img))
+    assert decoded.getpixel((0, 0)) == (10, 20, 30)
+    assert all(120 <= c <= 135 for c in decoded.getpixel((1, 0)))
+
+
+def test_흑백_이미지는_RGB로_읽는다():
+    decoded, _ = decode(png(Image.new("L", (8, 6), 77)))
+    assert decoded.mode == "RGB" and decoded.getpixel((0, 0)) == (77, 77, 77)
+
+
 def test_EXIF_회전을_반영한_크기를_쓴다():
     img = Image.new("RGB", (200, 100), (10, 20, 30))
     exif = img.getexif()
@@ -51,12 +76,56 @@ def test_EXIF_회전을_반영한_크기를_쓴다():
     assert original == (100, 200)   # 원본 크기도 보이는 방향 기준
 
 
+def _jpeg_with_orientation(size, orientation):
+    img = Image.new("RGB", size, (10, 20, 30))
+    exif = img.getexif()
+    exif[0x0112] = orientation
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", exif=exif)
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize("orientation,expected", [(1, (200, 100)), (3, (200, 100)), (8, (100, 200)), (5, (100, 200))])
+def test_EXIF_방향별로_90도_회전일_때만_가로세로가_바뀐다(orientation, expected):
+    data = _jpeg_with_orientation((200, 100), orientation)
+    decoded, original = decode(data)
+    assert decoded.size == expected and original == expected
+    result = FaceAnalyzer().analyze(data)
+    assert (result["width"], result["height"]) == expected
+
+
+def test_줄여_읽는_큰_JPEG도_EXIF_회전을_원본_크기에_반영한다():
+    decoded, original = decode(_jpeg_with_orientation((4000, 2000), 6))
+    assert original == (2000, 4000)
+    assert decoded.height > decoded.width and max(decoded.size) <= analyzer_module.MAX_WORK_EDGE
+
+
 def test_선명도는_흐린_이미지가_더_낮다():
     rng = np.random.RandomState(1)
     sharp = rng.randint(0, 255, (256, 256), dtype=np.uint8)
     import cv2
     blurry = cv2.GaussianBlur(sharp, (0, 0), 6)
     assert _sharpness(blurry, 128) < _sharpness(sharp, 128) / 20
+
+
+def test_선명도는_빈_영역이면_0이고_단색이면_0에_가깝다():
+    assert _sharpness(np.zeros((0, 0), dtype=np.uint8), 128) == 0.0
+    assert _sharpness(np.zeros((0, 5), dtype=np.uint8), 128) == 0.0
+    assert _sharpness(np.full((1, 1), 200, dtype=np.uint8), 128) == pytest.approx(0.0)
+
+
+def test_두_눈이_겹친_랜드마크는_정면도_0이다():
+    r = _row(10, 10, 50, 50)
+    r[6:8] = r[4:6]   # 왼쪽 눈 = 오른쪽 눈
+    face = FaceAnalyzer._measure(r, 1.0, 100, 100, np.full((100, 100), 50, dtype=np.uint8))
+    assert face.frontal == 0.0
+    assert face.brightness == pytest.approx(50.0)
+
+
+def test_검출_축소_비율을_되돌려_작업용_좌표로_잰다():
+    gray = np.full((400, 400), 128, dtype=np.uint8)
+    face = FaceAnalyzer._measure(_row(10, 10, 50, 50), 0.5, 400, 400, gray)
+    assert (face.x, face.y, face.width, face.height) == (20, 20, 100, 100)
 
 
 def test_정면도는_코가_가운데일수록_높다():
@@ -139,3 +208,16 @@ def test_얼굴_수는_상한까지만_돌려주고_전체_수를_따로_알린�
     assert len(result["faces"]) == 10
     sizes = [f["box"]["width"] for f in result["faces"]]
     assert sizes == sorted(sizes, reverse=True)
+
+
+@pytest.mark.parametrize("detected,cap,returned", [(3, 10, 3), (10, 10, 10), (4, 0, 0)])
+def test_얼굴_수가_상한_이하이거나_상한이_0일_때(monkeypatch, detected, cap, returned):
+    class FakeDetector:
+        def detect(self, _img):
+            return 1, np.array([_row(10 + i * 30, 10, 20, 20) for i in range(detected)], dtype=np.float32)
+
+    monkeypatch.setattr(analyzer_module.cv2.FaceDetectorYN, "create", staticmethod(lambda *a, **k: FakeDetector()))
+    monkeypatch.setattr(analyzer_module, "MAX_FACES", cap)
+    result = FaceAnalyzer().analyze(png(Image.new("RGB", (400, 100), (120, 120, 120))))
+    assert result["faceCount"] == detected
+    assert len(result["faces"]) == returned
