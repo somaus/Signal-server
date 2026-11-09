@@ -65,6 +65,9 @@ class DeepfakeDetectionControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     private DeepfakeDetection detection(String fileUrl) {
         DeepfakeDetection detection = DeepfakeDetection.builder().anonymousId("anon-1").fileUrl(fileUrl).build();
         ReflectionTestUtils.setField(detection, "id", 3L);

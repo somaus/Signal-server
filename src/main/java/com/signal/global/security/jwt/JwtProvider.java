@@ -32,18 +32,21 @@ public class JwtProvider {
         this.key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(secret));
     }
 
-    public String createAccessToken(Long userId, int tokenVersion) {
-        return createToken(userId, tokenVersion, "access", accessTokenExpiration);
+    public String createAccessToken(Long userId, int tokenVersion, String sessionId) {
+        return createToken(userId, tokenVersion, sessionId, null, "access", accessTokenExpiration);
     }
 
-    public String createRefreshToken(Long userId, int tokenVersion) {
-        return createToken(userId, tokenVersion, "refresh", refreshTokenExpiration);
+    public String createRefreshToken(Long userId, int tokenVersion, String sessionId, String jti) {
+        return createToken(userId, tokenVersion, sessionId, jti, "refresh", refreshTokenExpiration);
     }
 
-    private String createToken(Long userId, int tokenVersion, String type, long expiration) {
+    private String createToken(Long userId, int tokenVersion, String sessionId, String jti, String type,
+                               long expiration) {
         Date now = new Date();
         return Jwts.builder()
+                .id(jti)
                 .subject(String.valueOf(userId))
+                .claim("sid", sessionId)
                 .claim("type", type)
                 .claim("tokenVersion", tokenVersion)
                 .issuedAt(now)
@@ -56,6 +59,15 @@ public class JwtProvider {
         Integer version = parseClaims(token).get("tokenVersion", Integer.class);
         // tokenVersion 클레임이 없는 옛 토큰은 어떤 사용자 버전(0 이상)과도 맞지 않게 해 거부한다.
         return version == null ? -1 : version;
+    }
+
+    /** sid 클레임이 없는 옛 토큰은 null이며, 세션이 없는 토큰으로 취급해 거부한다. */
+    public String getSessionId(String token) {
+        return parseClaims(token).get("sid", String.class);
+    }
+
+    public String getJti(String token) {
+        return parseClaims(token).getId();
     }
 
     public boolean validateToken(String token) {
