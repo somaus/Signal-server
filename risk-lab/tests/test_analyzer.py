@@ -208,3 +208,16 @@ def test_얼굴_수는_상한까지만_돌려주고_전체_수를_따로_알린�
     assert len(result["faces"]) == 10
     sizes = [f["box"]["width"] for f in result["faces"]]
     assert sizes == sorted(sizes, reverse=True)
+
+
+@pytest.mark.parametrize("detected,cap,returned", [(3, 10, 3), (10, 10, 10), (4, 0, 0)])
+def test_얼굴_수가_상한_이하이거나_상한이_0일_때(monkeypatch, detected, cap, returned):
+    class FakeDetector:
+        def detect(self, _img):
+            return 1, np.array([_row(10 + i * 30, 10, 20, 20) for i in range(detected)], dtype=np.float32)
+
+    monkeypatch.setattr(analyzer_module.cv2.FaceDetectorYN, "create", staticmethod(lambda *a, **k: FakeDetector()))
+    monkeypatch.setattr(analyzer_module, "MAX_FACES", cap)
+    result = FaceAnalyzer().analyze(png(Image.new("RGB", (400, 100), (120, 120, 120))))
+    assert result["faceCount"] == detected
+    assert len(result["faces"]) == returned
