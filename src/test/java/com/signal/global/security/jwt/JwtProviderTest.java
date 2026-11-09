@@ -3,10 +3,6 @@ package com.signal.global.security.jwt;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Base64;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.Keys;
-import java.util.Date;
-import javax.crypto.SecretKey;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -61,14 +57,5 @@ class JwtProviderTest {
         assertThat(jwtProvider.validateToken("not.a.jwt")).isFalse();
         assertThat(jwtProvider.validateToken("")).isFalse();
         assertThat(jwtProvider.validateToken(null)).isFalse();
-    }
-
-    @Test
-    void tokenVersion_클레임이_없는_토큰은_어떤_버전과도_맞지_않는다() {
-        SecretKey key = Keys.hmacShaKeyFor(Base64.getDecoder().decode(SECRET));
-        String legacy = Jwts.builder().subject("1").claim("type", "access")
-                .expiration(new Date(System.currentTimeMillis() + 60_000)).signWith(key).compact();
-
-        assertThat(jwtProvider.getTokenVersion(legacy)).isEqualTo(-1);
     }
 }

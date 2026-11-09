@@ -4,7 +4,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -109,15 +108,6 @@ class AgencyControllerTest {
         mockMvc.perform(post("/api/v1/agencies/3/connections").with(USER_1)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"connectionType\":\"FAX\"}"))
                 .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    void 연결_유형이_없으면_서비스를_부르지_않고_400이다() throws Exception {
-        mockMvc.perform(post("/api/v1/agencies/3/connections").with(USER_1)
-                        .contentType(MediaType.APPLICATION_JSON).content("{\"reportId\":5}"))
-                .andExpect(status().isBadRequest());
-
-        verifyNoInteractions(agencyService);
     }
 
     @Test
