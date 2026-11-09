@@ -21,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -56,7 +57,7 @@ class UserServiceTest {
         MockMultipartFile image = new MockMultipartFile("image", "profile.png", "image/png", TestFileBytes.PNG);
 
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(fileStorage.store(any(), anyString())).thenReturn("/uploads/profile/generated.png");
+        when(fileStorage.store(any(MultipartFile.class), anyString())).thenReturn("/uploads/profile/generated.png");
 
         String result = userService.updateProfileImage(1L, image);
 
@@ -126,7 +127,7 @@ class UserServiceTest {
         user.updateProfileImage("/uploads/profile/old.png");
         MockMultipartFile image = new MockMultipartFile("image", "profile.png", "image/png", TestFileBytes.PNG);
         when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-        when(fileStorage.store(any(), anyString())).thenReturn("/uploads/profile/new.png");
+        when(fileStorage.store(any(MultipartFile.class), anyString())).thenReturn("/uploads/profile/new.png");
 
         userService.updateProfileImage(1L, image);
 

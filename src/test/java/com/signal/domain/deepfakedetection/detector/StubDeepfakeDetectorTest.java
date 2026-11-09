@@ -44,7 +44,7 @@ class StubDeepfakeDetectorTest {
         DeepfakeDetection detection = sampleDetection();
         when(deepfakeDetectionRepository.findById(1L)).thenReturn(Optional.of(detection));
         when(fileStorage.load("/uploads/deepfake-detections/original.png")).thenReturn(new byte[]{1, 2, 3});
-        when(fileStorage.store(any(byte[].class), anyString(), anyString())).thenReturn("/uploads/deepfake-detections/highlighted.png");
+        when(fileStorage.store(any(byte[].class), anyString())).thenReturn("/uploads/deepfake-detections/highlighted.png");
 
         stubDeepfakeDetector.detect(1L, "/uploads/deepfake-detections/original.png", false);
 
@@ -63,7 +63,7 @@ class StubDeepfakeDetectorTest {
         DeepfakeDetection detection = sampleDetection();
         when(deepfakeDetectionRepository.findById(1L)).thenReturn(Optional.of(detection));
         when(fileStorage.load(anyString())).thenReturn(new byte[]{1, 2, 3});
-        when(fileStorage.store(any(byte[].class), anyString(), anyString())).thenReturn("/uploads/deepfake-detections/highlighted.png");
+        when(fileStorage.store(any(byte[].class), anyString())).thenReturn("/uploads/deepfake-detections/highlighted.png");
 
         stubDeepfakeDetector.detect(1L, "/uploads/deepfake-detections/original.mp4", true);
 
@@ -75,7 +75,7 @@ class StubDeepfakeDetectorTest {
         DeepfakeDetection detection = sampleDetection();
         when(deepfakeDetectionRepository.findById(1L)).thenReturn(Optional.of(detection));
         when(fileStorage.load(anyString())).thenReturn(new byte[]{1, 2, 3});
-        when(fileStorage.store(any(byte[].class), anyString(), anyString())).thenReturn("/uploads/deepfake-detections/highlighted.png");
+        when(fileStorage.store(any(byte[].class), anyString())).thenReturn("/uploads/deepfake-detections/highlighted.png");
 
         stubDeepfakeDetector.detect(1L, "/uploads/deepfake-detections/original.png", false);
 
@@ -101,7 +101,7 @@ class StubDeepfakeDetectorTest {
         when(deepfakeDetectionRepository.findById(1L)).thenReturn(Optional.of(first));
         when(deepfakeDetectionRepository.findById(2L)).thenReturn(Optional.of(second));
         when(fileStorage.load(anyString())).thenReturn(new byte[]{9, 9, 9});
-        when(fileStorage.store(any(byte[].class), anyString(), anyString())).thenReturn("/uploads/deepfake-detections/highlighted.png");
+        when(fileStorage.store(any(byte[].class), anyString())).thenReturn("/uploads/deepfake-detections/highlighted.png");
 
         stubDeepfakeDetector.detect(1L, "/uploads/deepfake-detections/same.png", false);
         stubDeepfakeDetector.detect(2L, "/uploads/deepfake-detections/same.png", false);

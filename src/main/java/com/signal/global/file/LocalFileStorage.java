@@ -53,8 +53,12 @@ public class LocalFileStorage implements FileStorage {
     }
 
     @Override
-    public String store(byte[] content, String originalFilename, String directory) {
-        String filename = UUID.randomUUID() + extension(UploadFileType.detect(content));
+    public String store(byte[] content, String directory) {
+        // 서버가 만든 바이트라 형식을 모르면 클라이언트 잘못이 아니다. 415 대신 내부 오류로 던진다.
+        String extension = UploadFileType.detect(content)
+                .orElseThrow(() -> new IllegalStateException("서버가 생성한 파일의 형식을 알 수 없습니다: directory=" + directory))
+                .extension();
+        String filename = UUID.randomUUID() + "." + extension;
         Path target = resolveTarget(directory, filename);
 
         try {

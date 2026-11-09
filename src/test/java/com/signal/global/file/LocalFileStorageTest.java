@@ -42,8 +42,16 @@ class LocalFileStorageTest {
         assertThatThrownBy(() -> storage.store(html, "profile"))
                 .isInstanceOfSatisfying(SignalException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.UNSUPPORTED_MEDIA_TYPE));
-        assertThatThrownBy(() -> storage.store("<html></html>".getBytes(), "a.png", "profile"))
-                .isInstanceOf(SignalException.class);
+    }
+
+    @Test
+    void 서버가_만든_바이트의_형식을_알_수_없으면_415가_아니라_내부_오류로_던진다() {
+        LocalFileStorage storage = new LocalFileStorage(tempDir.toString(), "/uploads");
+        storage.init();
+
+        assertThatThrownBy(() -> storage.store("<html></html>".getBytes(), "profile"))
+                .isInstanceOf(IllegalStateException.class)
+                .isNotInstanceOf(SignalException.class);
     }
 
     @Test
@@ -51,7 +59,7 @@ class LocalFileStorageTest {
         LocalFileStorage storage = new LocalFileStorage(tempDir.toString(), "/uploads");
         storage.init();
 
-        String url = storage.store(TestFileBytes.PNG, "protected.png", "protections");
+        String url = storage.store(TestFileBytes.PNG, "protections");
 
         assertThat(url).startsWith("/uploads/protections/").endsWith(".png");
     }
@@ -60,7 +68,7 @@ class LocalFileStorageTest {
     void 저장한_파일을_URL로_다시_읽어올_수_있다() {
         LocalFileStorage storage = new LocalFileStorage(tempDir.toString(), "/uploads");
         storage.init();
-        String url = storage.store(TestFileBytes.PNG, "protected.png", "protections");
+        String url = storage.store(TestFileBytes.PNG, "protections");
 
         byte[] loaded = storage.load(url);
 
@@ -72,8 +80,8 @@ class LocalFileStorageTest {
         LocalFileStorage storage = new LocalFileStorage(tempDir.toString(), "/uploads");
         storage.init();
 
-        String url = storage.store(TestFileBytes.PNG, "evil.html/../../x", "profile");
-        String url2 = storage.store(TestFileBytes.PNG, "evil.p\\ng", "profile");
+        String url = storage.store(TestFileBytes.PNG, "profile");
+        String url2 = storage.store(TestFileBytes.PNG, "profile");
 
         assertThat(url).matches("^/uploads/profile/[0-9a-fA-F-]{36}\\.png$");
         assertThat(url2).matches("^/uploads/profile/[0-9a-fA-F-]{36}\\.png$");
@@ -102,7 +110,7 @@ class LocalFileStorageTest {
         LocalFileStorage storage = new LocalFileStorage(tempDir.resolve("root").toString(), "/uploads");
         storage.init();
 
-        assertThatThrownBy(() -> storage.store(TestFileBytes.PNG, "a.png", "../escape"))
+        assertThatThrownBy(() -> storage.store(TestFileBytes.PNG, "../escape"))
                 .isInstanceOfSatisfying(SignalException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT));
     }

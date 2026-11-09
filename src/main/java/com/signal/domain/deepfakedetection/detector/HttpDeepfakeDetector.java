@@ -111,7 +111,7 @@ public class HttpDeepfakeDetector implements DeepfakeDetector {
             Integer risk = scoreBased ? riskScore : null;
 
             List<Evidence> evidences = explain(content, band, width, height);
-            String highlightedResultUrl = fileStorage.store(content, "highlighted.png", HIGHLIGHTED_RESULT_DIRECTORY);
+            String highlightedResultUrl = fileStorage.store(content, HIGHLIGHTED_RESULT_DIRECTORY);
 
             log.info("딥페이크 탐지 완료: detectionId={}, model={}, modelVersion={}, score={}, band={}, basis={}, signals={}",
                     detectionId, response.model(), response.modelVersion(), score, band, assessment.basis(), signals);

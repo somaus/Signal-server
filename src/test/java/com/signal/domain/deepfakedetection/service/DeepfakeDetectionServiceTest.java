@@ -23,6 +23,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class DeepfakeDetectionServiceTest {
@@ -46,7 +47,7 @@ class DeepfakeDetectionServiceTest {
     @Test
     void 이미지를_업로드하면_PROCESSING_상태로_저장되고_탐지가_시작된다() {
         MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", TestFileBytes.PNG);
-        when(fileStorage.store(any(), anyString())).thenReturn("/uploads/deepfake-detections/generated.png");
+        when(fileStorage.store(any(MultipartFile.class), anyString())).thenReturn("/uploads/deepfake-detections/generated.png");
         when(deepfakeDetectionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         DeepfakeDetection detection = deepfakeDetectionService.createDetection(1L, null, file);
@@ -60,7 +61,7 @@ class DeepfakeDetectionServiceTest {
     @Test
     void 영상을_업로드하면_isVideo_true로_탐지가_시작된다() {
         MockMultipartFile file = new MockMultipartFile("file", "clip.mp4", "video/mp4", TestFileBytes.MP4);
-        when(fileStorage.store(any(), anyString())).thenReturn("/uploads/deepfake-detections/generated.mp4");
+        when(fileStorage.store(any(MultipartFile.class), anyString())).thenReturn("/uploads/deepfake-detections/generated.mp4");
         when(deepfakeDetectionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         DeepfakeDetection detection = deepfakeDetectionService.createDetection(1L, null, file);
@@ -100,7 +101,7 @@ class DeepfakeDetectionServiceTest {
     void 비로그인_사용자는_5회_미만이면_업로드할_수_있다() {
         MockMultipartFile file = new MockMultipartFile("file", "photo.png", "image/png", TestFileBytes.PNG);
         when(deepfakeDetectionRepository.countByAnonymousId("anon-1")).thenReturn(4L);
-        when(fileStorage.store(any(), anyString())).thenReturn("/uploads/deepfake-detections/generated.png");
+        when(fileStorage.store(any(MultipartFile.class), anyString())).thenReturn("/uploads/deepfake-detections/generated.png");
         when(deepfakeDetectionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         DeepfakeDetection detection = deepfakeDetectionService.createDetection(null, "anon-1", file);

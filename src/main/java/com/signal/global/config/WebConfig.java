@@ -24,7 +24,8 @@ public class WebConfig implements WebMvcConfigurer {
         String location = Path.of(uploadDir).toAbsolutePath().normalize().toUri().toString();
         registry.addResourceHandler("/uploads/**")
                 .addResourceLocations(location)
-                .resourceChain(true)
+                // 캐시를 끈다. 켜면 탈퇴·기록 삭제로 지운 파일의 Resource를 계속 돌려줘 404 대신 500이 난다.
+                .resourceChain(false)
                 .addResolver(new PathResourceResolver() {
                     @Override
                     protected Resource getResource(String resourcePath, Resource loc) throws IOException {

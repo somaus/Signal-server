@@ -29,6 +29,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class MonitoringServiceTest {
@@ -55,7 +56,7 @@ class MonitoringServiceTest {
     @Test
     void 모니터링을_생성하면_ACTIVE_상태로_저장되고_탐지가_시작된다() {
         MockMultipartFile image = new MockMultipartFile("referenceImage", "face.png", "image/png", TestFileBytes.PNG);
-        when(fileStorage.store(any(), anyString())).thenReturn("/uploads/monitorings/generated.png");
+        when(fileStorage.store(any(MultipartFile.class), anyString())).thenReturn("/uploads/monitorings/generated.png");
         when(monitoringRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         Monitoring monitoring = monitoringService.createMonitoring(1L, image);
