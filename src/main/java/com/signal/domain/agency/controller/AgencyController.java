@@ -1,5 +1,6 @@
 package com.signal.domain.agency.controller;
 
+import jakarta.validation.Valid;
 import com.signal.domain.agency.dto.request.CreateConnectionRequest;
 import com.signal.domain.agency.dto.response.AgencyListResponse;
 import com.signal.domain.agency.dto.response.ConnectionResponse;
@@ -39,7 +40,7 @@ public class AgencyController {
     public ResponseEntity<ConnectionResponse> createConnection(
             @AuthenticationPrincipal Long userId,
             @PathVariable Long agencyId,
-            @RequestBody CreateConnectionRequest request) {
+            @Valid @RequestBody CreateConnectionRequest request) {
         AgencyConnection connection = agencyService.createConnection(
                 userId, agencyId, request.reportId(), request.connectionType());
         return ResponseEntity.status(HttpStatus.CREATED).body(ConnectionResponse.from(connection));
