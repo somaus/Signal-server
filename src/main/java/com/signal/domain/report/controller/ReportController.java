@@ -10,6 +10,9 @@ import com.signal.domain.report.entity.ReportEvidence;
 import com.signal.domain.report.service.ReportService;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.CacheControl;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -79,6 +82,20 @@ public class ReportController {
             @RequestBody UpdateReportRequest request) {
         Report report = reportService.updateReport(userId, reportId, request);
         return ResponseEntity.ok(ReportResponse.from(report));
+    }
+
+    /** 신고 문서(PDF). 파일로 저장하지 않고 요청할 때 신고서 내용으로 만든다. */
+    @GetMapping("/{reportId}/document")
+    public ResponseEntity<byte[]> getDocument(
+            @AuthenticationPrincipal Long userId,
+            @PathVariable Long reportId) {
+        byte[] pdf = reportService.renderDocument(userId, reportId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename("signal-report-" + reportId + ".pdf").build().toString())
+                .cacheControl(CacheControl.noStore())
+                .body(pdf);
     }
 
     @PostMapping("/{reportId}/finalize")

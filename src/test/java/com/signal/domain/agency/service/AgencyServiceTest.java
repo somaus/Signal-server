@@ -90,18 +90,17 @@ class AgencyServiceTest {
     }
 
     @Test
-    void reportId가_있으면_소유자검증_후_문서URL을_첨부한다() {
+    void reportId가_있으면_소유자검증_후_문서_경로를_첨부한다() {
         Agency agency = sampleAgency();
         when(agencyRepository.findById(1L)).thenReturn(Optional.of(agency));
         Report report = Report.builder()
-                .userId(1L).description("설명").sourceUrls(List.of("https://a")).evidenceIds(List.of())
-                .documentUrl("https://stub/report.pdf").build();
+                .userId(1L).description("설명").sourceUrls(List.of("https://a")).evidenceIds(List.of()).build();
         when(reportService.getReport(1L, 5L)).thenReturn(report);
         when(agencyConnectionRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         AgencyConnection connection = agencyService.createConnection(1L, 1L, 5L, ConnectionType.DOCUMENT_SUBMIT);
 
-        assertThat(connection.getAttachedReportUrl()).isEqualTo("https://stub/report.pdf");
+        assertThat(connection.getAttachedReportUrl()).isEqualTo("/api/v1/reports/5/document");
     }
 
     @Test
