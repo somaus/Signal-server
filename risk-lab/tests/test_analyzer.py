@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
+import analyzer as analyzer_module
 from analyzer import FaceAnalyzer, InvalidImage, decode, _sharpness
 
 
@@ -35,7 +36,8 @@ def test_깨진_바이트는_InvalidImage():
 
 def test_투명_PNG는_흰_배경에_합성해_읽는다():
     img = Image.new("RGBA", (10, 10), (0, 0, 0, 0))
-    assert decode(png(img)).getpixel((0, 0)) == (255, 255, 255)
+    decoded, _ = decode(png(img))
+    assert decoded.getpixel((0, 0)) == (255, 255, 255)
 
 
 def test_EXIF_회전을_반영한_크기를_쓴다():
@@ -44,7 +46,9 @@ def test_EXIF_회전을_반영한_크기를_쓴다():
     exif[0x0112] = 6   # 시계 방향 90도
     buf = io.BytesIO()
     img.save(buf, "JPEG", exif=exif)
-    assert decode(buf.getvalue()).size == (100, 200)
+    decoded, original = decode(buf.getvalue())
+    assert decoded.size == (100, 200)
+    assert original == (100, 200)   # 원본 크기도 보이는 방향 기준
 
 
 def test_선명도는_흐린_이미지가_더_낮다():
@@ -78,3 +82,60 @@ def test_실제_얼굴_사진에서_얼굴을_찾는다():
     assert len(result["faces"]) >= 1
     face = result["faces"][0]
     assert 0 < face["areaRatio"] <= 1 and 0 <= face["frontal"] <= 1
+
+
+def _row(x, y, w, h):
+    r = np.zeros(15, dtype=np.float32)
+    r[:4] = [x, y, w, h]
+    r[4:6] = [x + w * 0.3, y + h * 0.4]; r[6:8] = [x + w * 0.7, y + h * 0.4]; r[8:10] = [x + w * 0.5, y + h * 0.6]
+    r[10:12] = [x + w * 0.35, y + h * 0.8]; r[12:14] = [x + w * 0.65, y + h * 0.8]; r[14] = 0.9
+    return r
+
+
+def test_가장자리에_걸친_얼굴도_이미지_안에_박스가_남는다():
+    gray = np.full((200, 300), 128, dtype=np.uint8)
+    cases = [(-20, -10, 60, 50), (270, 170, 60, 50), (290, 190, 40, 40), (-50, -50, 30, 30)]
+    for x, y, w, h in cases:
+        face = FaceAnalyzer._measure(_row(x, y, w, h), 1.0, 300, 200, gray)
+        assert 0 <= face.x < 300 and 0 <= face.y < 200
+        assert face.width >= 1 and face.height >= 1
+        assert face.x + face.width <= 300 and face.y + face.height <= 200
+
+
+def test_큰_사진은_줄여서_읽고_좌표와_크기는_원본_기준으로_낸다():
+    big = Image.new("RGB", (6000, 4000), (200, 200, 200))
+    decoded, original = decode(png(big))
+    assert original == (6000, 4000)
+    assert max(decoded.size) <= analyzer_module.MAX_WORK_EDGE
+    face = FaceAnalyzer._measure(_row(512, 256, 256, 256), 1.0, decoded.width, decoded.height,
+                                 np.full((decoded.height, decoded.width), 128, dtype=np.uint8),
+                                 to_orig=original[0] / decoded.width)
+    # 작업용 이미지의 256px 얼굴은 원본에서는 약 2.93배인 750px 안팎
+    assert 700 <= face.face_px <= 800
+    result = FaceAnalyzer().analyze(png(big))
+    assert (result["width"], result["height"]) == (6000, 4000)
+    assert result["faces"] == [] and result["faceCount"] == 0
+
+
+def test_JPEG는_크기를_줄여_읽어도_원본_크기를_알려준다():
+    buf = io.BytesIO()
+    Image.new("RGB", (5000, 3000), (90, 100, 110)).save(buf, "JPEG", quality=80)
+    result = FaceAnalyzer().analyze(buf.getvalue())
+    assert (result["width"], result["height"]) == (5000, 3000)
+
+
+def test_얼굴_수는_상한까지만_돌려주고_전체_수를_따로_알린다(monkeypatch):
+    class FakeDetector:
+        def detect(self, _img):
+            rows = [_row(10 + i * 20, 10, 10 + i, 10 + i) for i in range(15)]
+            return 1, np.array(rows, dtype=np.float32)
+
+    monkeypatch.setattr(analyzer_module.cv2.FaceDetectorYN, "create", staticmethod(lambda *a, **k: FakeDetector()))
+    monkeypatch.setattr(analyzer_module, "MAX_FACES", 10)
+
+    result = FaceAnalyzer().analyze(png(Image.new("RGB", (400, 100), (120, 120, 120))))
+
+    assert result["faceCount"] == 15
+    assert len(result["faces"]) == 10
+    sizes = [f["box"]["width"] for f in result["faces"]]
+    assert sizes == sorted(sizes, reverse=True)

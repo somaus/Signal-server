@@ -19,7 +19,9 @@ from PIL import Image, ImageOps
 MODEL_PATH = Path(__file__).with_name("face_detection_yunet_2023mar.onnx")
 MODEL_NAME = "yunet"
 MODEL_VERSION = "2023mar"
-MAX_DETECT_EDGE = 1280   # 검출 입력의 긴 변 상한. 측정은 원본 해상도로 한다.
+MAX_WORK_EDGE = 2048     # 디코딩 직후 이 크기로 줄인 이미지로만 검출·측정한다. 좌표와 픽셀 수는 원본 기준으로 되돌려 낸다.
+MAX_DETECT_EDGE = 1280   # 검출 입력의 긴 변 상한
+MAX_FACES = int(os.environ.get("RISK_MAX_FACES", "10"))   # 돌려주는 얼굴 수의 상한(면적이 큰 순서). 개수 제한은 여기서만 한다.
 SCORE_THRESHOLD = 0.6
 SHARPNESS_CROP = 128     # 선명도를 얼굴 크기와 무관하게 비교하려고 정규화하는 크기
 
@@ -53,21 +55,34 @@ class Face:
         }
 
 
-def decode(data: bytes) -> Image.Image:
+def decode(data: bytes) -> tuple[Image.Image, tuple[int, int]]:
+    """이미지를 열어 작업용 크기(긴 변 MAX_WORK_EDGE 이하)로 줄여 돌려준다. 원본 크기(회전 반영)도 함께 돌려준다.
+
+    큰 사진을 원본 크기로 풀어 여러 벌 복사하면 메모리가 크게 늘어난다. JPEG는 디코딩 단계에서 줄여 읽고(draft),
+    그 밖의 형식도 줄이는 즉시 원본 크기 비트맵을 버린다.
+    """
     try:
         img = Image.open(io.BytesIO(data))
-        img = ImageOps.exif_transpose(img)   # 회전 정보를 반영해 보이는 방향 기준 좌표를 낸다
+        orig_w, orig_h = img.size
+        orientation = img.getexif().get(0x0112)
+        if img.format == "JPEG":
+            img.draft("RGB", (MAX_WORK_EDGE, MAX_WORK_EDGE))
         img.load()
+        if max(img.size) > MAX_WORK_EDGE:
+            img.thumbnail((MAX_WORK_EDGE, MAX_WORK_EDGE), Image.LANCZOS)
+        img = ImageOps.exif_transpose(img)   # 회전 정보를 반영해 보이는 방향 기준 좌표를 낸다
     except Exception as e:  # PIL이 내는 예외 종류가 많다
         raise InvalidImage("이미지를 읽을 수 없습니다.") from e
-    if img.width < 1 or img.height < 1:
+    if orig_w < 1 or orig_h < 1 or img.width < 1 or img.height < 1:
         raise InvalidImage("빈 이미지입니다.")
+    if orientation in (5, 6, 7, 8):   # 90도 회전이 들어간 사진은 가로·세로가 바뀐다
+        orig_w, orig_h = orig_h, orig_w
     if img.mode in ("RGBA", "LA", "P"):
         img = img.convert("RGBA")
         bg = Image.new("RGB", img.size, (255, 255, 255))
         bg.paste(img, mask=img.getchannel("A"))
-        return bg
-    return img.convert("RGB")
+        return bg, (orig_w, orig_h)
+    return img.convert("RGB"), (orig_w, orig_h)
 
 
 class FaceAnalyzer:
@@ -76,15 +91,18 @@ class FaceAnalyzer:
         # FaceDetectorYN은 상태(입력 크기)를 가지므로 호출마다 만든다. 모델이 작아(약 0.3MB) 부담이 적다.
 
     def analyze(self, data: bytes) -> dict:
-        img = decode(data)
-        width, height = img.size
+        img, (width, height) = decode(data)
+        work_w, work_h = img.size
         rgb = np.asarray(img)
         bgr = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
         gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+        del rgb
 
-        scale = min(1.0, MAX_DETECT_EDGE / max(width, height))
-        det_bgr = bgr if scale == 1.0 else cv2.resize(
-            bgr, (round(width * scale), round(height * scale)), interpolation=cv2.INTER_AREA)
+        # 검출과 측정은 작업용 이미지에서 하고, 박스와 픽셀 수는 원본 기준으로 되돌린다.
+        to_orig = width / work_w
+        det_scale = min(1.0, MAX_DETECT_EDGE / max(work_w, work_h))
+        det_bgr = bgr if det_scale == 1.0 else cv2.resize(
+            bgr, (round(work_w * det_scale), round(work_h * det_scale)), interpolation=cv2.INTER_AREA)
         dh, dw = det_bgr.shape[:2]
         detector = cv2.FaceDetectorYN.create(self._model_path, "", (dw, dh), SCORE_THRESHOLD, 0.3, 5000)
         _, raw = detector.detect(det_bgr)
@@ -92,7 +110,7 @@ class FaceAnalyzer:
         faces: list[Face] = []
         if raw is not None:
             for row in raw:
-                faces.append(self._measure(row, scale, width, height, gray))
+                faces.append(self._measure(row, det_scale, work_w, work_h, gray, to_orig))
         faces.sort(key=lambda f: f.width * f.height, reverse=True)
 
         return {
@@ -101,18 +119,23 @@ class FaceAnalyzer:
             "width": width,
             "height": height,
             "megapixels": round(width * height / 1e6, 3),
-            "imageSharpness": round(_sharpness(gray, 512), 2),
-            "faces": [f.to_dict() for f in faces],
+            "faceCount": len(faces),   # 검출한 전체 수. faces는 이 중 큰 순서로 MAX_FACES개까지
+            "faces": [f.to_dict() for f in faces[:MAX_FACES]],
         }
 
     @staticmethod
-    def _measure(row: np.ndarray, scale: float, width: int, height: int, gray: np.ndarray) -> Face:
-        x, y, w, h = (float(v) / scale for v in row[:4])
-        x0, y0 = max(0, int(round(x))), max(0, int(round(y)))
-        x1, y1 = min(width, int(round(x + w))), min(height, int(round(y + h)))
-        bw, bh = max(1, x1 - x0), max(1, y1 - y0)
-        # landmarks: 오른쪽 눈, 왼쪽 눈, 코끝, 오른쪽 입꼬리, 왼쪽 입꼬리 (이미지 기준 좌표)
-        lm = row[4:14].reshape(5, 2) / scale
+    def _measure(row: np.ndarray, det_scale: float, work_w: int, work_h: int, gray: np.ndarray,
+                 to_orig: float = 1.0) -> Face:
+        """row는 검출 입력 기준 좌표, gray는 작업용 이미지. 결과의 박스와 face_px는 원본 기준이다."""
+        x, y, w, h = (float(v) / det_scale for v in row[:4])   # 작업용 이미지 기준
+        # 가장자리에 걸친 얼굴도 이미지 안에 최소 1x1이 남도록 자른다(이미지 밖 박스를 만들지 않는다).
+        x0 = min(max(0, int(round(x))), work_w - 1)
+        y0 = min(max(0, int(round(y))), work_h - 1)
+        x1 = min(work_w, max(x0 + 1, int(round(x + w))))
+        y1 = min(work_h, max(y0 + 1, int(round(y + h))))
+        bw, bh = x1 - x0, y1 - y0
+        # landmarks: 오른쪽 눈, 왼쪽 눈, 코끝, 오른쪽 입꼬리, 왼쪽 입꼬리
+        lm = row[4:14].reshape(5, 2) / det_scale
         eye_r, eye_l, nose = lm[0], lm[1], lm[2]
         eye_dist = float(np.linalg.norm(eye_l - eye_r))
         if eye_dist < 1e-6:
@@ -124,11 +147,13 @@ class FaceAnalyzer:
             offset = abs(float(np.dot(nose - mid, axis))) / eye_dist
             frontal = float(max(0.0, 1.0 - offset / 0.5))
         crop = gray[y0:y1, x0:x1]
+        ox, oy = int(round(x0 * to_orig)), int(round(y0 * to_orig))
+        ow, oh = max(1, int(round(bw * to_orig))), max(1, int(round(bh * to_orig)))
         return Face(
-            x=x0, y=y0, width=bw, height=bh,
+            x=ox, y=oy, width=ow, height=oh,
             confidence=float(row[14]),
-            area_ratio=(bw * bh) / float(width * height),
-            face_px=int(min(bw, bh)),
+            area_ratio=(bw * bh) / float(work_w * work_h),
+            face_px=int(min(ow, oh)),
             sharpness=_sharpness(crop, SHARPNESS_CROP),
             frontal=frontal,
             brightness=float(crop.mean()) if crop.size else 0.0,
