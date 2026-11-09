@@ -66,6 +66,9 @@ def create_app(encoder_factory: Optional[Callable[[], Encoder]] = None, device: 
             if img.width * img.height > MAX_PIXELS:
                 raise HTTPException(status_code=413, detail="image too large")
             img.load()
+        except Image.DecompressionBombError:
+            # PIL 자체 한도를 넘는 헤더는 Image.open에서 바로 터져 위 픽셀 검사까지 오지 못한다.
+            raise HTTPException(status_code=413, detail="image too large")
         except (UnidentifiedImageError, OSError):
             raise HTTPException(status_code=400, detail="not a valid image")
 
