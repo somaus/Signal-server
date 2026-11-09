@@ -12,7 +12,7 @@ class ReportTest {
     private Report report() {
         return Report.builder().userId(1L).incidentDate(LocalDate.of(2026, 1, 1)).discoveryRoute("SNS")
                 .damageType("합성").description("설명").sourceUrls(List.of("https://a")).evidenceIds(List.of(1L))
-                .targetAgencyType("POLICE").additionalNotes("메모").documentUrl("doc.pdf").build();
+                .targetAgencyType("POLICE").additionalNotes("메모").build();
     }
 
     @Test
@@ -27,8 +27,7 @@ class ReportTest {
     void applyPatch에서_null은_그대로_두고_빈_Optional은_값을_지운다() {
         Report r = report();
 
-        r.applyPatch(null, Optional.empty(), null, null, Optional.empty(), null, null, Optional.of("새 메모"),
-                "doc.pdf");
+        r.applyPatch(null, Optional.empty(), null, null, Optional.empty(), null, null, Optional.of("새 메모"));
 
         assertThat(r.getIncidentDate()).isEqualTo(LocalDate.of(2026, 1, 1));
         assertThat(r.getDiscoveryRoute()).isNull();
@@ -47,7 +46,7 @@ class ReportTest {
         Report r = report();
 
         r.applyPatch(null, null, null, null, Optional.of(List.of("https://b")), Optional.of(List.of(2L)), null,
-                null, null);
+                null);
         r.getSourceUrls().add("https://c");
 
         assertThat(r.getSourceUrls()).containsExactly("https://b", "https://c");
@@ -55,13 +54,12 @@ class ReportTest {
     }
 
     @Test
-    void markFinalized하면_FINALIZED가_되고_문서_주소와_타임라인이_남는다() {
+    void markFinalized하면_FINALIZED가_되고_타임라인이_남는다() {
         Report r = report();
 
-        r.markFinalized("final.pdf");
+        r.markFinalized();
 
         assertThat(r.getStatus()).isEqualTo(ReportStatus.FINALIZED);
-        assertThat(r.getDocumentUrl()).isEqualTo("final.pdf");
         assertThat(r.getTimeline()).extracting(TimelineEntry::getEvent).last().isEqualTo(TimelineEvent.FINALIZED);
     }
 
