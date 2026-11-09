@@ -108,6 +108,26 @@ def test_선명도는_흐린_이미지가_더_낮다():
     assert _sharpness(blurry, 128) < _sharpness(sharp, 128) / 20
 
 
+def test_선명도는_빈_영역이면_0이고_단색이면_0에_가깝다():
+    assert _sharpness(np.zeros((0, 0), dtype=np.uint8), 128) == 0.0
+    assert _sharpness(np.zeros((0, 5), dtype=np.uint8), 128) == 0.0
+    assert _sharpness(np.full((1, 1), 200, dtype=np.uint8), 128) == pytest.approx(0.0)
+
+
+def test_두_눈이_겹친_랜드마크는_정면도_0이다():
+    r = _row(10, 10, 50, 50)
+    r[6:8] = r[4:6]   # 왼쪽 눈 = 오른쪽 눈
+    face = FaceAnalyzer._measure(r, 1.0, 100, 100, np.full((100, 100), 50, dtype=np.uint8))
+    assert face.frontal == 0.0
+    assert face.brightness == pytest.approx(50.0)
+
+
+def test_검출_축소_비율을_되돌려_작업용_좌표로_잰다():
+    gray = np.full((400, 400), 128, dtype=np.uint8)
+    face = FaceAnalyzer._measure(_row(10, 10, 50, 50), 0.5, 400, 400, gray)
+    assert (face.x, face.y, face.width, face.height) == (20, 20, 100, 100)
+
+
 def test_정면도는_코가_가운데일수록_높다():
     def row(nose_x):
         # x y w h, 오른쪽 눈, 왼쪽 눈, 코, 입 2개, 신뢰도
