@@ -1,12 +1,12 @@
 package com.signal.global.security.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import com.signal.domain.auth.repository.RefreshTokenRepository;
 import com.signal.domain.user.repository.UserRepository;
 import java.util.Optional;
 import org.junit.jupiter.api.AfterEach;
@@ -32,14 +32,11 @@ class JwtAuthenticationFilterTest {
     @Mock
     private UserRepository userRepository;
 
-    @Mock
-    private RefreshTokenRepository refreshTokenRepository;
-
     private JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @BeforeEach
     void setUp() {
-        jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtProvider, userRepository, refreshTokenRepository);
+        jwtAuthenticationFilter = new JwtAuthenticationFilter(jwtProvider, userRepository);
         SecurityContextHolder.clearContext();
     }
 
@@ -63,9 +60,8 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
         when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
         when(jwtProvider.getTokenVersion(TOKEN)).thenReturn(0);
-        when(userRepository.findTokenVersionById(1L)).thenReturn(Optional.of(0));
         when(jwtProvider.getSessionId(TOKEN)).thenReturn("sess-1");
-        when(refreshTokenRepository.existsBySessionId("sess-1")).thenReturn(true);
+        when(userRepository.findTokenVersionByIdWithLiveSession(1L, "sess-1")).thenReturn(Optional.of(0));
 
         Authentication authentication = doFilterWithBearer(TOKEN);
 
@@ -80,7 +76,8 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
         when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
         when(jwtProvider.getTokenVersion(TOKEN)).thenReturn(0);
-        when(userRepository.findTokenVersionById(1L)).thenReturn(Optional.of(1));
+        when(jwtProvider.getSessionId(TOKEN)).thenReturn("sess-1");
+        when(userRepository.findTokenVersionByIdWithLiveSession(1L, "sess-1")).thenReturn(Optional.of(1));
 
         assertThat(doFilterWithBearer(TOKEN)).isNull();
     }
@@ -90,10 +87,8 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
         when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
-        when(jwtProvider.getTokenVersion(TOKEN)).thenReturn(0);
-        when(userRepository.findTokenVersionById(1L)).thenReturn(Optional.of(0));
         when(jwtProvider.getSessionId(TOKEN)).thenReturn("sess-1");
-        when(refreshTokenRepository.existsBySessionId("sess-1")).thenReturn(false);
+        when(userRepository.findTokenVersionByIdWithLiveSession(1L, "sess-1")).thenReturn(Optional.empty());
 
         assertThat(doFilterWithBearer(TOKEN)).isNull();
     }
@@ -103,9 +98,21 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
         when(jwtProvider.getUserId(TOKEN)).thenReturn(99L);
-        when(userRepository.findTokenVersionById(99L)).thenReturn(Optional.empty());
+        when(jwtProvider.getSessionId(TOKEN)).thenReturn("sess-1");
+        when(userRepository.findTokenVersionByIdWithLiveSession(99L, "sess-1")).thenReturn(Optional.empty());
 
         assertThat(doFilterWithBearer(TOKEN)).isNull();
+    }
+
+    @Test
+    void 세션_식별자가_없는_액세스_토큰으로는_조회_없이_인증하지_않는다() throws Exception {
+        when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
+        when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
+        when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
+        when(jwtProvider.getSessionId(TOKEN)).thenReturn(null);
+
+        assertThat(doFilterWithBearer(TOKEN)).isNull();
+        verify(userRepository, never()).findTokenVersionByIdWithLiveSession(anyLong(), any());
     }
 
     @Test
@@ -114,7 +121,7 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(true);
 
         assertThat(doFilterWithBearer(TOKEN)).isNull();
-        verify(userRepository, never()).findTokenVersionById(anyLong());
+        verify(userRepository, never()).findTokenVersionByIdWithLiveSession(anyLong(), any());
     }
 
     @Test

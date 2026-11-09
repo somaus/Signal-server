@@ -12,6 +12,7 @@ import com.signal.domain.user.repository.UserRepository;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.security.jwt.JwtProvider;
+import java.time.LocalDateTime;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,10 @@ public class AuthService {
 
     @Value("${jwt.access-token-expiration}")
     private long accessTokenExpiration;
+
+    /** 방금 쓴 리프레시 토큰이 이 시간(초) 안에 다시 오면 재사용(탈취)이 아닌 중복 요청으로 보고 세션을 유지한다. */
+    @Value("${jwt.refresh-reuse-grace-seconds:15}")
+    private long refreshReuseGraceSeconds;
 
     @Transactional
     public TokenResponse login(LoginRequest request) {
@@ -108,14 +113,23 @@ public class AuthService {
         }
 
         // 회전: 한 번 쓴 토큰은 폐기된다. 이미 쓴 토큰이 다시 오면 탈취로 보고 그 세션의 토큰을 모두 폐기한다.
-        if (refreshTokenRepository.markUsed(jti) == 0) {
-            if (refreshTokenRepository.existsById(jti)) {
-                refreshTokenRepository.deleteBySessionId(sessionId);
-            }
+        // 다만 방금 쓴 토큰이 유예 시간 안에 다시 오면(두 번째 탭, 응답 유실 뒤 재전송) 정상 중복 요청일 수 있어
+        // 세션은 두고 이 요청만 거절한다. 먼저 간 요청이 받은 새 토큰은 그대로 유효하다.
+        if (refreshTokenRepository.markUsed(jti, LocalDateTime.now()) == 0) {
+            refreshTokenRepository.findById(jti).ifPresent(used -> {
+                if (!isWithinReuseGrace(used)) {
+                    refreshTokenRepository.deleteBySessionId(sessionId);
+                }
+            });
             throw new SignalException(ErrorCode.INVALID_REFRESH_TOKEN);
         }
 
         return issueTokens(user, sessionId);
+    }
+
+    private boolean isWithinReuseGrace(RefreshToken used) {
+        return used.getUsedAt() != null
+                && used.getUsedAt().plusSeconds(refreshReuseGraceSeconds).isAfter(LocalDateTime.now());
     }
 
     @Transactional

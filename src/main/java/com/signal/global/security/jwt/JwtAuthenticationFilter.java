@@ -1,6 +1,5 @@
 package com.signal.global.security.jwt;
 
-import com.signal.domain.auth.repository.RefreshTokenRepository;
 import com.signal.domain.user.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -8,6 +7,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.util.List;
+import java.util.Optional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -25,7 +25,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
     private final UserRepository userRepository;
-    private final RefreshTokenRepository refreshTokenRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -39,10 +38,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String sessionId = jwtProvider.getSessionId(token);
 
             // 탈퇴한 사용자의 토큰, 비밀번호 재설정으로 tokenVersion이 올라간 뒤의 토큰, 로그아웃해 세션이 폐기된 뒤의
-            // 토큰은 만료 전까지 서명이 유효하다. 사용자 존재·tokenVersion·세션 생존을 함께 확인해 이런 토큰을 거른다.
-            userRepository.findTokenVersionById(userId)
+            // 토큰은 만료 전까지 서명이 유효하다. 사용자 존재·tokenVersion·세션 생존을 한 번의 쿼리로 확인해 거른다.
+            Optional<Integer> tokenVersion = sessionId == null
+                    ? Optional.empty()
+                    : userRepository.findTokenVersionByIdWithLiveSession(userId, sessionId);
+            tokenVersion
                     .filter(version -> version == jwtProvider.getTokenVersion(token))
-                    .filter(version -> sessionId != null && refreshTokenRepository.existsBySessionId(sessionId))
                     .ifPresent(version -> {
                         var authentication = new UsernamePasswordAuthenticationToken(
                                 userId, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));

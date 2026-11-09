@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.LocalDateTime;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -28,6 +29,9 @@ public class RefreshToken {
     /** 재발급에 한 번 쓰였으면 true. 다시 오면 재사용(탈취 의심)이다. */
     @Column(nullable = false)
     private boolean used;
+
+    /** 재발급에 쓰인 시각. 쓰이지 않았거나 이 컬럼이 생기기 전에 쓰인 토큰은 null이다. */
+    private LocalDateTime usedAt;
 
     public RefreshToken(String jti, Long userId, String sessionId) {
         this.jti = jti;

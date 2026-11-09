@@ -64,6 +64,7 @@ class AuthServiceTest {
         authService = new AuthService(userRepository, passwordEncoder, jwtProvider, verificationService,
                 refreshTokenRepository);
         ReflectionTestUtils.setField(authService, "accessTokenExpiration", 3_600_000L);
+        ReflectionTestUtils.setField(authService, "refreshReuseGraceSeconds", 15L);
 
         user = User.builder().email("user@example.com").password("encoded").name("사용자").build();
         ReflectionTestUtils.setField(user, "id", USER_ID);
@@ -77,15 +78,17 @@ class AuthServiceTest {
                     stored.put(t.getJti(), t);
                     return t;
                 });
-        lenient().when(refreshTokenRepository.existsById(org.mockito.ArgumentMatchers.anyString()))
-                .thenAnswer(i -> stored.containsKey(i.<String>getArgument(0)));
-        lenient().when(refreshTokenRepository.markUsed(org.mockito.ArgumentMatchers.anyString()))
+        lenient().when(refreshTokenRepository.findById(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(i -> Optional.ofNullable(stored.get(i.<String>getArgument(0))));
+        lenient().when(refreshTokenRepository.markUsed(org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any(java.time.LocalDateTime.class)))
                 .thenAnswer(i -> {
                     RefreshToken t = stored.get(i.<String>getArgument(0));
                     if (t == null || t.isUsed()) {
                         return 0;
                     }
                     ReflectionTestUtils.setField(t, "used", true);
+                    ReflectionTestUtils.setField(t, "usedAt", i.<java.time.LocalDateTime>getArgument(1));
                     return 1;
                 });
         lenient().doAnswer(i -> stored.values().removeIf(t -> t.getSessionId().equals(i.getArgument(0))))
@@ -159,9 +162,33 @@ class AuthServiceTest {
     }
 
     @Test
-    void 이미_쓴_토큰이_다시_오면_그_세션의_토큰을_모두_폐기한다() {
+    void 이미_쓴_토큰이_유예_시간_뒤에_다시_오면_그_세션의_토큰을_모두_폐기한다() {
+        ReflectionTestUtils.setField(authService, "refreshReuseGraceSeconds", 0L);
         String first = login().refreshToken();
         String second = authService.reissue(first).refreshToken();
+
+        assertInvalidRefreshToken(first);
+
+        assertInvalidRefreshToken(second);
+    }
+
+    @Test
+    void 방금_쓴_토큰이_유예_시간_안에_다시_오면_거절만_하고_세션은_유지한다() {
+        String first = login().refreshToken();
+        String second = authService.reissue(first).refreshToken();
+
+        assertInvalidRefreshToken(first);
+
+        // 먼저 간 요청이 받은 새 토큰은 계속 쓸 수 있다
+        assertThat(authService.reissue(second)).isNotNull();
+    }
+
+    @Test
+    void 쓰인_시각이_없는_기존_토큰이_다시_오면_유예_없이_재사용으로_본다() {
+        String first = login().refreshToken();
+        String second = authService.reissue(first).refreshToken();
+        // 기존 행(used_at 없음)을 흉내 낸다
+        ReflectionTestUtils.setField(stored.get(jwtProvider.getJti(first)), "usedAt", null);
 
         assertInvalidRefreshToken(first);
 
