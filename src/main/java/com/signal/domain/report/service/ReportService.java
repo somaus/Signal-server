@@ -20,6 +20,7 @@ import java.util.Optional;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,7 +41,8 @@ public class ReportService {
     private final ReportPdfRenderer reportPdfRenderer;
     private final FileStorage fileStorage;
 
-    @Transactional
+    // 요약은 외부 LLM 호출(최대 ~15초)이라 DB 커넥션을 쥔 채 기다리지 않도록 트랜잭션 밖에서 만든다.
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public Report createReport(Long userId, CreateReportRequest request) {
         validateRequired(request.description(), request.sourceUrls());
         validateEvidenceOwnership(userId, request.evidenceIds());
