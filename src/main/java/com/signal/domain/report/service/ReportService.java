@@ -81,12 +81,14 @@ public class ReportService {
         }
 
         boolean descriptionChanged = description != null && !description.equals(report.getDescription());
+        boolean damageTypeChanged = request.getDamageType() != null
+                && !java.util.Objects.equals(request.getDamageType().orElse(null), report.getDamageType());
         report.applyPatch(
                 request.getIncidentDate(), request.getDiscoveryRoute(), request.getDamageType(),
                 description, request.getSourceUrls(), request.getEvidenceIds(),
                 request.getTargetAgencyType(), request.getAdditionalNotes());
-        if (descriptionChanged) {
-            // 원문이 바뀌면 옛 요약이 남지 않게 다시 만든다. 못 만들면 요약 없이 둔다.
+        if (descriptionChanged || damageTypeChanged || report.getSummary() == null) {
+            // 요약 입력(원문·피해 유형)이 바뀌었거나 이전 생성이 실패했으면 다시 만든다. 못 만들면 요약 없이 둔다.
             report.updateSummary(
                     reportSummarizer.summarize(report.getDescription(), report.getDamageType()).orElse(null));
         }
