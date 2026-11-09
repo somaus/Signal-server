@@ -25,6 +25,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
@@ -76,6 +77,10 @@ public class HttpRiskAnalyzer implements RiskAnalyzer {
             return toResult(measurement, GpsMetadata.present(content), LanguageContext.current());
         } catch (SignalException e) {
             throw e;
+        } catch (HttpClientErrorException e) {
+            // 400(디코딩 실패)·413(해상도 초과)은 이미지 문제라 재시도해도 같다.
+            log.info("위험도 측정 서비스가 이미지를 거절했습니다: status={}", e.getStatusCode());
+            throw new SignalException(ErrorCode.INVALID_INPUT);
         } catch (Exception e) {
             log.warn("위험도 측정 서비스 호출 실패, 분석하지 못함으로 응답합니다.", e);
             throw new SignalException(isTimeout(e) ? ErrorCode.ANALYSIS_TIMEOUT : ErrorCode.ANALYSIS_UNAVAILABLE);
