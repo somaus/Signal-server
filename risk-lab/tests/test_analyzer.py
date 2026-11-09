@@ -76,6 +76,30 @@ def test_EXIF_회전을_반영한_크기를_쓴다():
     assert original == (100, 200)   # 원본 크기도 보이는 방향 기준
 
 
+def _jpeg_with_orientation(size, orientation):
+    img = Image.new("RGB", size, (10, 20, 30))
+    exif = img.getexif()
+    exif[0x0112] = orientation
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", exif=exif)
+    return buf.getvalue()
+
+
+@pytest.mark.parametrize("orientation,expected", [(1, (200, 100)), (3, (200, 100)), (8, (100, 200)), (5, (100, 200))])
+def test_EXIF_방향별로_90도_회전일_때만_가로세로가_바뀐다(orientation, expected):
+    data = _jpeg_with_orientation((200, 100), orientation)
+    decoded, original = decode(data)
+    assert decoded.size == expected and original == expected
+    result = FaceAnalyzer().analyze(data)
+    assert (result["width"], result["height"]) == expected
+
+
+def test_줄여_읽는_큰_JPEG도_EXIF_회전을_원본_크기에_반영한다():
+    decoded, original = decode(_jpeg_with_orientation((4000, 2000), 6))
+    assert original == (2000, 4000)
+    assert decoded.height > decoded.width and max(decoded.size) <= analyzer_module.MAX_WORK_EDGE
+
+
 def test_선명도는_흐린_이미지가_더_낮다():
     rng = np.random.RandomState(1)
     sharp = rng.randint(0, 255, (256, 256), dtype=np.uint8)
