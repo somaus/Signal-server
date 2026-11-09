@@ -102,7 +102,6 @@ class FaceAnalyzer:
             "width": width,
             "height": height,
             "megapixels": round(width * height / 1e6, 3),
-            "imageSharpness": round(_sharpness(gray, 512), 2),
             "faces": [f.to_dict() for f in faces],
         }
 

@@ -26,7 +26,7 @@ Docker Compose에서는 기본 배포에 포함되지 않고 프로필로 켠다
 ## API
 
 - `GET /health`
-- `POST /analyze` (multipart `file`) → `{model, modelVersion, width, height, megapixels, imageSharpness, faces:[{box:{x,y,width,height}, confidence, areaRatio, facePx, sharpness, frontal, brightness}]}`. 얼굴은 면적이 큰 순서.
+- `POST /analyze` (multipart `file`) → `{model, modelVersion, width, height, megapixels, faces:[{box:{x,y,width,height}, confidence, areaRatio, facePx, sharpness, frontal, brightness}]}`. 얼굴은 면적이 큰 순서.
   빈 파일·읽을 수 없는 파일 400, 15MB 초과(`RISK_MAX_BYTES`) 또는 8천만 화소 초과(`RISK_MAX_PIXELS`) 413.
 
 인증이 없으므로 포트를 게시하지 않고 compose 내부망의 app에서만 호출한다. 한 번에 한 장씩 처리한다(`RISK_MAX_CONCURRENCY`, 기본 1).
