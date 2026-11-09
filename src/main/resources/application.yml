@@ -105,6 +105,12 @@ deepfake-detection:
   explain:
     enabled: ${DEEPFAKE_EXPLAIN_ENABLED:false}   # true면 비전 LLM이 이미 정해진 등급을 설명한다(등급은 바꾸지 못함)
 
+risk-analysis:
+  mode: ${RISK_ANALYSIS_MODE:llm}   # llm: 비전 LLM이 점수를 추정(LlmRiskAnalyzer, 기본) / http: risk-lab의 얼굴 검출·측정값으로 계산(HttpRiskAnalyzer, docs/risk-analysis.md)
+  http:
+    base-url: ${RISK_ANALYSIS_API_URL:http://localhost:8000}
+    timeout-seconds: ${RISK_ANALYSIS_API_TIMEOUT_SECONDS:20}
+
 chat:
   llm:
     enabled: ${CHAT_LLM_ENABLED:true}                     # false면 룰 기반(RuleBasedChatEngine) 답변만 사용

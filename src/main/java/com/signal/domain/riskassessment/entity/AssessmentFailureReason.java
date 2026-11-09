@@ -7,5 +7,7 @@ package com.signal.domain.riskassessment.entity;
 public enum AssessmentFailureReason {
     NO_FACE_DETECTED,
     AI_SERVER_ERROR,
-    TIMEOUT
+    TIMEOUT,
+    /** 이미지를 읽을 수 없거나 해상도·용량이 너무 커서 분석기가 거절했다. 같은 이미지로 다시 시도해도 실패한다. */
+    INVALID_IMAGE
 }

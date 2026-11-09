@@ -9,21 +9,15 @@ import com.signal.domain.deepfakedetection.entity.ProvenanceSignal;
 import com.signal.domain.deepfakedetection.entity.Verdict;
 import com.signal.domain.deepfakedetection.repository.DeepfakeDetectionRepository;
 import com.signal.global.file.FileStorage;
-import java.net.SocketTimeoutException;
-import java.net.http.HttpTimeoutException;
-import java.time.Duration;
+import com.signal.global.http.InternalServiceClient;
 import java.util.List;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 
 /**
@@ -65,7 +59,7 @@ public class HttpDeepfakeDetector implements DeepfakeDetector {
                                 ObjectProvider<DeepfakeExplainer> explainer,
                                 @Value("${deepfake-detection.http.base-url:http://localhost:8000}") String baseUrl,
                                 @Value("${deepfake-detection.http.timeout-seconds:60}") long timeoutSeconds) {
-        this(fileStorage, deepfakeDetectionRepository, buildClient(restClientBuilder, baseUrl, timeoutSeconds),
+        this(fileStorage, deepfakeDetectionRepository, InternalServiceClient.create(restClientBuilder, baseUrl, timeoutSeconds),
                 bandPolicy, explainer.getIfAvailable());
     }
 
@@ -85,14 +79,6 @@ public class HttpDeepfakeDetector implements DeepfakeDetector {
         this.explainer = explainer;
     }
 
-    private static RestClient buildClient(RestClient.Builder builder, String baseUrl, long timeoutSeconds) {
-        // 전역 http.client.read-timeout(10초)은 첫 추론에 짧을 수 있어 이 클라이언트만 따로 설정한다.
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(Duration.ofSeconds(5));
-        factory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
-        return builder.baseUrl(baseUrl).requestFactory(factory).build();
-    }
-
     @Override
     @Async
     public void detect(Long detectionId, String fileUrl, boolean isVideo) {
@@ -106,7 +92,7 @@ public class HttpDeepfakeDetector implements DeepfakeDetector {
 
             DetectResponse response = restClient.post()
                     .uri("/detect")
-                    .body(multipartBody(content, fileUrl))
+                    .body(InternalServiceClient.fileBody(content, InternalServiceClient.filenameOf(fileUrl)))
                     .retrieve()
                     .body(DetectResponse.class);
 
@@ -136,7 +122,7 @@ public class HttpDeepfakeDetector implements DeepfakeDetector {
                 deepfakeDetectionRepository.save(detection);
             });
         } catch (Exception e) {
-            DetectionFailureReason reason = isTimeout(e)
+            DetectionFailureReason reason = InternalServiceClient.isTimeout(e)
                     ? DetectionFailureReason.TIMEOUT
                     : DetectionFailureReason.AI_SERVER_ERROR;
             log.warn("딥페이크 탐지 서비스 호출 실패, 분석하지 못함으로 처리합니다: detectionId={}, reason={}",
@@ -185,36 +171,6 @@ public class HttpDeepfakeDetector implements DeepfakeDetector {
             throw new IllegalStateException("탐지 서비스 score가 0~1 범위를 벗어났습니다: " + score);
         }
         return score;
-    }
-
-    private static MultiValueMap<String, Object> multipartBody(byte[] bytes, String fileUrl) {
-        String filename = filenameOf(fileUrl);
-        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
-        body.add("file", new ByteArrayResource(bytes) {
-            @Override
-            public String getFilename() {
-                return filename;
-            }
-        });
-        return body;
-    }
-
-    private static String filenameOf(String url) {
-        if (url == null || url.isBlank()) {
-            return "image";
-        }
-        int slash = url.lastIndexOf('/');
-        String name = slash >= 0 ? url.substring(slash + 1) : url;
-        return name.isBlank() ? "image" : name;
-    }
-
-    private static boolean isTimeout(Throwable e) {
-        for (Throwable cause = e; cause != null; cause = cause.getCause()) {
-            if (cause instanceof SocketTimeoutException || cause instanceof HttpTimeoutException) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /** detect-lab의 POST /detect 응답. 모르는 필드는 무시한다. */

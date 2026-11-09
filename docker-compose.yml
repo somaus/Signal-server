@@ -34,6 +34,8 @@ services:
       PROTECTION_API_URL: http://protection:8000
       DEEPFAKE_DETECTION_MODE: ${DEEPFAKE_DETECTION_MODE:-llm}   # http로 바꾸면 detect 서비스(전용 탐지 모델)를 호출
       DEEPFAKE_DETECTION_API_URL: http://detect:8000
+      RISK_ANALYSIS_MODE: ${RISK_ANALYSIS_MODE:-llm}   # http로 바꾸면 risk 서비스(얼굴 검출·측정)로 위험도를 계산
+      RISK_ANALYSIS_API_URL: http://risk:8000
       MONITORING_MODE: ${MONITORING_MODE:-stub}   # search로 바꾸면 웹 역이미지 검색(GOOGLE_VISION_API_KEY 필요, 얼굴 사진이 Google로 전송됨)
       GOOGLE_VISION_API_KEY: ${GOOGLE_VISION_API_KEY:-}
       WEB_SEARCH_PROVIDER: ${WEB_SEARCH_PROVIDER:-none}   # serpapi로 바꾸면 탐지한 사진을 웹에서 역검색(SERPAPI_API_KEY, WEB_SEARCH_PUBLIC_BASE_URL 필요, 얼굴 사진이 외부로 전송됨)
@@ -77,6 +79,20 @@ services:
       timeout: 5s
       retries: 5
       start_period: 120s
+
+  # 위험도 분석 측정 서비스(얼굴 검출 + 측정). 기본 배포에는 포함되지 않으며 `docker compose --profile risk up -d --build risk` 로 켠다.
+  risk:
+    profiles: ["risk"]
+    build: ./risk-lab
+    restart: unless-stopped
+    mem_limit: ${RISK_MEM_LIMIT:-512m}   # 4천만 화소 이미지 처리 시 최대 약 270MB(+기본 60MB)로 쟀다. 잠정값이라 배포 후 docker stats로 조정한다.
+    # 포트를 게시하지 않는다(인증이 없으므로 compose 내부망의 app에서만 호출).
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
 volumes:
   mysql-data:

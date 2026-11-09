@@ -48,6 +48,31 @@ public final class RiskTexts {
                 "在图片文件中未发现位置（GPS）元数据。");
     }
 
+
+    /** 이미지 품질 항목의 설명. 점수의 근거가 된 측정값(얼굴 한 변 픽셀, 선명도)을 그대로 적는다. */
+    public static String measuredQuality(int facePx, double sharpness, ResponseLanguage language) {
+        String sharp = String.format(java.util.Locale.ROOT, "%.0f", sharpness);
+        return pick(language,
+                "얼굴 한 변이 " + facePx + "px이고 선명도 측정값은 " + sharp + "입니다. 얼굴이 클수록, 또렷할수록 합성 재료로 쓰기 좋습니다.",
+                "The face is " + facePx + "px on its short side with a measured sharpness of " + sharp
+                        + ". Larger, sharper faces are easier to use as source material.",
+                "顔の短辺は" + facePx + "pxで、鮮明度の測定値は" + sharp + "です。顔が大きく鮮明なほど、合成の素材として使われやすくなります。",
+                "面部短边为" + facePx + "px，清晰度测量值为" + sharp + "。面部越大、越清晰，越容易被用作合成素材。");
+    }
+
+    /** 얼굴 노출도 항목의 설명. faceCount는 검출한 얼굴 수, 비율은 퍼센트 값이다. */
+    public static String measuredExposure(int faceCount, double areaPercent, double frontalPercent,
+                                          ResponseLanguage language) {
+        String area = String.format(java.util.Locale.ROOT, "%.1f", areaPercent);
+        String frontal = String.format(java.util.Locale.ROOT, "%.0f", frontalPercent);
+        return pick(language,
+                "얼굴 " + faceCount + "개를 검출했고, 가장 노출이 큰 얼굴이 화면의 " + area + "%를 차지하며 정면도는 " + frontal + "%입니다.",
+                faceCount + " face(s) detected; the most exposed one covers " + area
+                        + "% of the image and is " + frontal + "% frontal.",
+                "顔を" + faceCount + "件検出しました。最も露出している顔は画面の" + area + "%を占め、正面度は" + frontal + "%です。",
+                "检测到" + faceCount + "张面部，暴露最多的面部占画面的" + area + "%，正面度为" + frontal + "%。");
+    }
+
     public static String defaultNote(ResponseLanguage language) {
         return pick(language, "AI 분석 결과", "AI analysis result", "AI分析結果", "AI分析结果");
     }
