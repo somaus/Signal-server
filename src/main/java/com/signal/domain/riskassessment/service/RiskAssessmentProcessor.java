@@ -39,9 +39,11 @@ public class RiskAssessmentProcessor {
             }
             markCompleted(assessmentId, result);
         } catch (SignalException e) {
-            AssessmentFailureReason reason = e.getErrorCode() == ErrorCode.ANALYSIS_TIMEOUT
-                    ? AssessmentFailureReason.TIMEOUT
-                    : AssessmentFailureReason.AI_SERVER_ERROR;
+            AssessmentFailureReason reason = switch (e.getErrorCode()) {
+                case ANALYSIS_TIMEOUT -> AssessmentFailureReason.TIMEOUT;
+                case INVALID_INPUT -> AssessmentFailureReason.INVALID_IMAGE;
+                default -> AssessmentFailureReason.AI_SERVER_ERROR;
+            };
             log.warn("위험도 분석 실패: assessmentId={}, reason={}", assessmentId, reason, e);
             markFailed(assessmentId, reason);
         } catch (Exception e) {
