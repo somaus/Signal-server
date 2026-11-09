@@ -1,5 +1,6 @@
 package com.signal.global.security.jwt;
 
+import com.signal.domain.auth.repository.RefreshTokenRepository;
 import com.signal.domain.user.repository.UserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -24,6 +25,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtProvider jwtProvider;
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
@@ -34,13 +36,17 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (token != null && jwtProvider.validateToken(token) && !jwtProvider.isRefreshToken(token)) {
             Long userId = jwtProvider.getUserId(token);
 
-            // 탈퇴한 사용자의 토큰이나, 로그아웃·비밀번호 재설정으로 tokenVersion이 올라간 뒤의 옛 액세스 토큰은
-            // 만료 전까지 서명이 유효하다. 사용자 존재와 tokenVersion을 함께 확인해 이런 토큰을 거른다.
+            String sessionId = jwtProvider.getSessionId(token);
+
+            // 탈퇴한 사용자의 토큰, 비밀번호 재설정으로 tokenVersion이 올라간 뒤의 토큰, 로그아웃해 세션이 폐기된 뒤의
+            // 토큰은 만료 전까지 서명이 유효하다. 사용자 존재·tokenVersion·세션 생존을 함께 확인해 이런 토큰을 거른다.
             userRepository.findTokenVersionById(userId)
                     .filter(version -> version == jwtProvider.getTokenVersion(token))
+                    .filter(version -> sessionId != null && refreshTokenRepository.existsBySessionId(sessionId))
                     .ifPresent(version -> {
                         var authentication = new UsernamePasswordAuthenticationToken(
                                 userId, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+                        authentication.setDetails(sessionId);
                         SecurityContextHolder.getContext().setAuthentication(authentication);
                     });
         }

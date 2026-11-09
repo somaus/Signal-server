@@ -60,6 +60,9 @@ class UserControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     private User user() {
         User user = User.builder().email("a@b.com").password("x").name("홍길동").age(30)
                 .gender(User.Gender.MALE).build();

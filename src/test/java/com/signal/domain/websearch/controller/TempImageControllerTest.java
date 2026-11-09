@@ -41,6 +41,9 @@ class TempImageControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     @Test
     void 토큰이_있으면_인증_없이_이미지를_no_store로_반환한다() throws Exception {
         byte[] bytes = {1, 2, 3};

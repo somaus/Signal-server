@@ -61,6 +61,9 @@ class AgencyControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     @Test
     void 기관_목록은_인증_없이_조회되고_상황_유형으로_거른다() throws Exception {
         Agency agency = Agency.builder().name("테스트기관").phone("1234").website("https://a.kr")

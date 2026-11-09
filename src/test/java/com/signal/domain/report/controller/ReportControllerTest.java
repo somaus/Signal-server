@@ -68,6 +68,9 @@ class ReportControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     private Report report() {
         Report report = Report.builder().userId(1L).incidentDate(LocalDate.of(2026, 1, 2))
                 .description("피해 설명").sourceUrls(List.of("https://x.com/1")).evidenceIds(List.of()).build();

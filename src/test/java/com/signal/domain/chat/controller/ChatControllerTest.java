@@ -66,6 +66,9 @@ class ChatControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     private ChatSession session(boolean saveConsent) {
         return ChatSession.builder().sessionId("s-1").userId(1L).saveConsent(saveConsent).build();
     }

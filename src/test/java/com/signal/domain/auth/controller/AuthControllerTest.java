@@ -62,6 +62,9 @@ class AuthControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     private ResultActions postJson(String url, String body) throws Exception {
         return mockMvc.perform(post(url).contentType(MediaType.APPLICATION_JSON).content(body));
     }
@@ -183,11 +186,13 @@ class AuthControllerTest {
     }
 
     @Test
-    void 로그아웃은_인증된_사용자의_토큰을_무효화하고_204다() throws Exception {
-        mockMvc.perform(post("/api/v1/auth/logout").with(authentication(new UsernamePasswordAuthenticationToken(
-                        1L, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))))))
+    void 로그아웃은_현재_세션을_폐기하고_204다() throws Exception {
+        var authentication = new UsernamePasswordAuthenticationToken(
+                1L, null, List.of(new SimpleGrantedAuthority("ROLE_USER")));
+        authentication.setDetails("sess-1");
+        mockMvc.perform(post("/api/v1/auth/logout").with(authentication(authentication)))
                 .andExpect(status().isNoContent());
-        verify(authService).logout(1L);
+        verify(authService).logout("sess-1");
     }
 
     @Test
