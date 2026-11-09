@@ -6,6 +6,8 @@ package com.signal.domain.riskassessment.entity;
  */
 public enum AssessmentFailureReason {
     NO_FACE_DETECTED,
+    /** 이미지를 디코딩할 수 없거나 해상도가 너무 커서 분석할 수 없음. 재시도해도 같은 결과. */
+    INVALID_IMAGE,
     AI_SERVER_ERROR,
     TIMEOUT
 }
