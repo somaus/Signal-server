@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.signal.domain.chat.engine.SituationType;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 class ConsultationStageTest {
 
@@ -27,8 +29,8 @@ class ConsultationStageTest {
         assertThat(ConsultationStage.SITUATION_CHECK.isApplicableTo(null)).isTrue();
     }
 
-    @org.junit.jupiter.params.ParameterizedTest
-    @org.junit.jupiter.params.provider.EnumSource(SituationType.class)
+    @ParameterizedTest
+    @EnumSource(SituationType.class)
     void 모든_상담_유형에는_적용되는_단계가_하나_이상_있다(SituationType type) {
         assertThat(ConsultationStage.applicableTo(type)).isNotEmpty();
     }
