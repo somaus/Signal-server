@@ -18,7 +18,6 @@ def test_huge_header_between_limits_returns_413(client):
     assert r.status_code == 413
 
 
-@pytest.mark.xfail(strict=True, reason="PIL DecompressionBombError가 잡히지 않아 500이 난다 (app.py 버그)")
 def test_huge_header_beyond_pil_limit_returns_413(client):
     r = client.post("/protect", files={"file": ("a.png", png_header_only(20_000, 20_000), "image/png")})
     assert r.status_code == 413
