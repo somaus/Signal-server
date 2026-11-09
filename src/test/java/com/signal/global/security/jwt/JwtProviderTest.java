@@ -28,22 +28,31 @@ class JwtProviderTest {
 
     @Test
     void 액세스_토큰에서_사용자와_토큰_버전을_읽는다() {
-        String token = jwtProvider.createAccessToken(42L, 3);
+        String token = jwtProvider.createAccessToken(42L, 3, "sess-1");
 
         assertThat(jwtProvider.validateToken(token)).isTrue();
         assertThat(jwtProvider.getUserId(token)).isEqualTo(42L);
         assertThat(jwtProvider.getTokenVersion(token)).isEqualTo(3);
+        assertThat(jwtProvider.getSessionId(token)).isEqualTo("sess-1");
         assertThat(jwtProvider.isRefreshToken(token)).isFalse();
     }
 
     @Test
+    void 리프레시_토큰에서_jti와_세션을_읽는다() {
+        String token = jwtProvider.createRefreshToken(1L, 0, "sess-1", "jti-1");
+
+        assertThat(jwtProvider.getJti(token)).isEqualTo("jti-1");
+        assertThat(jwtProvider.getSessionId(token)).isEqualTo("sess-1");
+    }
+
+    @Test
     void 리프레시_토큰은_type으로_구분된다() {
-        assertThat(jwtProvider.isRefreshToken(jwtProvider.createRefreshToken(1L, 0))).isTrue();
+        assertThat(jwtProvider.isRefreshToken(jwtProvider.createRefreshToken(1L, 0, "s", "j"))).isTrue();
     }
 
     @Test
     void 만료된_토큰은_유효하지_않다() {
-        String expired = provider(SECRET, -1_000, -1_000).createAccessToken(1L, 0);
+        String expired = provider(SECRET, -1_000, -1_000).createAccessToken(1L, 0, "s");
 
         assertThat(jwtProvider.validateToken(expired)).isFalse();
     }
@@ -51,7 +60,7 @@ class JwtProviderTest {
     @Test
     void 다른_키로_서명한_토큰은_유효하지_않다() {
         String otherSecret = Base64.getEncoder().encodeToString("fedcba9876543210fedcba9876543210".getBytes());
-        String forged = provider(otherSecret, 60_000, 60_000).createAccessToken(1L, 0);
+        String forged = provider(otherSecret, 60_000, 60_000).createAccessToken(1L, 0, "s");
 
         assertThat(jwtProvider.validateToken(forged)).isFalse();
     }
