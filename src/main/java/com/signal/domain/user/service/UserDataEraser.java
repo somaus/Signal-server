@@ -93,7 +93,12 @@ public class UserDataEraser {
         reportEvidenceRepository.deleteAll(evidences);
 
         List<AgencyConnection> connections = agencyConnectionRepository.findByUserId(userId);
-        connections.forEach(connection -> add(files, connection.getAttachedReportUrl()));
+        // attachedReportUrl은 지금은 신고 문서를 내려받는 API 경로(/api/...)라 지울 파일이 없다.
+        // 문서를 파일로 저장하던 때의 기록은 업로드 경로(/uploads/...)를 갖고 있으므로 그 경우에만 파일을 지운다.
+        connections.stream()
+                .map(AgencyConnection::getAttachedReportUrl)
+                .filter(url -> url != null && url.startsWith("/uploads/"))
+                .forEach(url -> add(files, url));
         agencyConnectionRepository.deleteAll(connections);
 
         List<ChatSession> sessions = chatSessionRepository.findByUserIdOrderByCreatedAtDesc(userId);

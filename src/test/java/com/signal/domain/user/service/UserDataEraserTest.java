@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -140,6 +141,19 @@ class UserDataEraserTest {
         verify(fileStorage).delete("/uploads/monitoring/m.png");
         verify(fileStorage).delete("/uploads/report-evidences/e.png");
         verify(fileStorage).delete("/uploads/reports/c.pdf");
+    }
+
+    @Test
+    void 기관_연결의_신고_문서_주소가_API_경로이면_파일로_지우려_하지_않는다() {
+        AgencyConnection apiPath = AgencyConnection.builder().userId(USER_ID).agencyId(4L)
+                .connectionType(ConnectionType.WEB).attachedReportUrl("/api/v1/reports/5/document").build();
+        when(agencyConnectionRepository.findByUserId(USER_ID)).thenReturn(List.of(connection, apiPath));
+
+        eraser.eraseAll(USER_ID, null);
+
+        verify(fileStorage, never()).delete("/api/v1/reports/5/document");
+        verify(fileStorage).delete("/uploads/reports/c.pdf");   // 옛 기록(파일로 저장하던 때)은 그대로 지운다
+        verify(agencyConnectionRepository).deleteAll(List.of(connection, apiPath));
     }
 
     @Test
