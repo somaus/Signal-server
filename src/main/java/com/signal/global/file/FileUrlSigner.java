@@ -5,6 +5,7 @@ import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.time.Clock;
 import java.util.HexFormat;
+import java.util.regex.Pattern;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,8 +19,8 @@ import org.springframework.stereotype.Component;
 @Component
 public class FileUrlSigner {
 
-    // 프로필 사진만 공개한다. 나머지 하위 경로는 모두 서명이 필요하다.
-    private static final String PUBLIC_PREFIX = "/uploads/profile/";
+    // 프로필 사진만 공개한다. 디코딩 전 원본 URI로 판단하므로 허용 목록으로 좁혀 %2e%2e 같은 인코딩 우회를 막는다.
+    private static final Pattern PUBLIC_PATH = Pattern.compile("^/uploads/profile/[A-Za-z0-9_-][A-Za-z0-9._-]*$");
 
     private final byte[] secret;
     private final long ttlSeconds;
@@ -47,7 +48,7 @@ public class FileUrlSigner {
     }
 
     public boolean requiresSignature(String path) {
-        return path.startsWith("/uploads/") && !(path.startsWith(PUBLIC_PREFIX) && !path.contains(".."));
+        return path.startsWith("/uploads/") && !(PUBLIC_PATH.matcher(path).matches() && !path.contains(".."));
     }
 
     public boolean verify(String path, String exp, String sig) {
