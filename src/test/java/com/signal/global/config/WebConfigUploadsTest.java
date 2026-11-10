@@ -4,6 +4,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.signal.domain.user.repository.UserRepository;
+import com.signal.global.file.FileUrlSigner;
 import com.signal.global.file.TestFileBytes;
 import com.signal.global.health.HealthController;
 import com.signal.global.security.jwt.JwtProvider;
@@ -27,13 +28,16 @@ import org.springframework.test.web.servlet.MockMvc;
  */
 @WebMvcTest(controllers = HealthController.class)
 @AutoConfigureMockMvc(addFilters = false)
-@Import(WebConfig.class)
+@Import({WebConfig.class, FileUrlSigner.class})
 class WebConfigUploadsTest {
 
     private static final Path UPLOAD_DIR = createUploadDir();
 
     @Autowired
     private MockMvc mockMvc;
+
+    @Autowired
+    private FileUrlSigner signer;
 
     @MockitoBean
     private JwtProvider jwtProvider;
@@ -52,6 +56,8 @@ class WebConfigUploadsTest {
     @DynamicPropertySource
     static void uploadDir(DynamicPropertyRegistry registry) {
         registry.add("file.upload-dir", UPLOAD_DIR::toString);
+        registry.add("file.url-signing-secret", () -> "test-secret");
+        registry.add("file.url-ttl-seconds", () -> "3600");
     }
 
     @AfterAll
@@ -66,12 +72,12 @@ class WebConfigUploadsTest {
         Path file = Files.createDirectories(UPLOAD_DIR.resolve("protections")).resolve("a.png");
         Files.write(file, TestFileBytes.PNG);
 
-        mockMvc.perform(get("/uploads/protections/a.png")).andExpect(status().isOk());
-        mockMvc.perform(get("/uploads/protections/a.png")).andExpect(status().isOk());
+        mockMvc.perform(get(signer.sign("/uploads/protections/a.png"))).andExpect(status().isOk());
+        mockMvc.perform(get(signer.sign("/uploads/protections/a.png"))).andExpect(status().isOk());
 
         Files.delete(file);
 
-        mockMvc.perform(get("/uploads/protections/a.png")).andExpect(status().isNotFound());
+        mockMvc.perform(get(signer.sign("/uploads/protections/a.png"))).andExpect(status().isNotFound());
     }
 
     @Test
@@ -80,5 +86,28 @@ class WebConfigUploadsTest {
         Files.writeString(file, "<script>alert(1)</script>");
 
         mockMvc.perform(get("/uploads/profile/x.html")).andExpect(status().isNotFound());
+    }
+
+    @Test
+    void 민감한_경로는_서명이_없거나_틀리거나_만료되면_403이다() throws Exception {
+        Path file = Files.createDirectories(UPLOAD_DIR.resolve("evidence")).resolve("e.png");
+        Files.write(file, TestFileBytes.PNG);
+
+        mockMvc.perform(get("/uploads/evidence/e.png")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/uploads/evidence/e.png?exp=9999999999&sig=bad")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/uploads/evidence/e.png?exp=1&sig=bad")).andExpect(status().isForbidden());
+        // 다른 파일용으로 받은 서명은 이 파일에 쓸 수 없다.
+        String other = signer.sign("/uploads/evidence/other.png");
+        mockMvc.perform(get("/uploads/evidence/e.png" + other.substring(other.indexOf('?'))))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get(signer.sign("/uploads/evidence/e.png"))).andExpect(status().isOk());
+    }
+
+    @Test
+    void 프로필_사진은_서명_없이_열린다() throws Exception {
+        Path file = Files.createDirectories(UPLOAD_DIR.resolve("profile")).resolve("p.png");
+        Files.write(file, TestFileBytes.PNG);
+
+        mockMvc.perform(get("/uploads/profile/p.png")).andExpect(status().isOk());
     }
 }

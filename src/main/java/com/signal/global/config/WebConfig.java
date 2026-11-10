@@ -1,16 +1,23 @@
 package com.signal.global.config;
 
+import com.signal.global.file.FileUrlSigner;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
+import org.springframework.web.servlet.HandlerInterceptor;
+import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.servlet.resource.PathResourceResolver;
 
 @Configuration
+@RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
 
     private static final Pattern SERVED_EXTENSIONS =
@@ -18,6 +25,25 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Value("${file.upload-dir}")
     private String uploadDir;
+
+    private final FileUrlSigner fileUrlSigner;
+
+    /** 프로필 사진을 뺀 /uploads는 만료되지 않은 올바른 서명이 있어야 열린다. */
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(new HandlerInterceptor() {
+            @Override
+            public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
+                String path = request.getRequestURI();
+                if (!fileUrlSigner.requiresSignature(path)
+                        || fileUrlSigner.verify(path, request.getParameter("exp"), request.getParameter("sig"))) {
+                    return true;
+                }
+                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                return false;
+            }
+        }).addPathPatterns("/uploads/**");
+    }
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
