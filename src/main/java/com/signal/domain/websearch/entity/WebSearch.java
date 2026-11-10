@@ -34,7 +34,8 @@ public class WebSearch {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false, unique = true)
+    /** 탐지의 검색이면 탐지 id이고, 위험도 분석에서 한 검색(한도만 세는 행)이면 null이다. */
+    @Column(unique = true)
     private Long detectionId;
 
     /** 한도를 세기 위한 소유자 키("u:사용자id" 또는 "a:익명id"). */
