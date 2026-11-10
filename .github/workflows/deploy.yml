@@ -124,6 +124,7 @@ jobs:
           # 평가(#33, #35)로 기준선을 넘는 걸 확인한 뒤 변수를 http로 만들어 켠다. llm이면 detect를 띄우지 않고 기존 비전 LLM 탐지로 배포한다.
           DETECTION_MODE: ${{ vars.DEEPFAKE_DETECTION_MODE || 'llm' }}
           DEPLOY_SHA: ${{ github.sha }}
+          FILE_URL_SIGNING_SECRET: ${{ secrets.FILE_URL_SIGNING_SECRET }}
           RUN_SCHEMA_UPDATE: ${{ inputs.run_schema_update || false }}
         run: |
           ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" -o BatchMode=yes \
@@ -134,6 +135,7 @@ jobs:
                && APP_IMAGE='$APP_IMAGE' \
                   GHCR_USER='$GHCR_USER' \
                   GHCR_TOKEN='$GHCR_TOKEN' \
+                  FILE_URL_SIGNING_SECRET='$FILE_URL_SIGNING_SECRET' \
                   DETECT_IMAGE='$DETECT_IMAGE' \
                   DEEPFAKE_DETECTION_MODE='$DETECTION_MODE' \
                   RUN_SCHEMA_UPDATE='$RUN_SCHEMA_UPDATE' \
