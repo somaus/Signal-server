@@ -7,6 +7,7 @@ import com.signal.domain.deepfakedetection.service.DeepfakeDetectionService;
 import com.signal.domain.deepfakedetection.dto.response.WebSearchResponse;
 import com.signal.domain.websearch.entity.WebSearch;
 import com.signal.domain.websearch.service.WebSearchService;
+import com.signal.global.file.FileUrlSigner;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import java.util.Locale;
@@ -32,6 +33,7 @@ public class DeepfakeDetectionController {
 
     private final DeepfakeDetectionService deepfakeDetectionService;
     private final WebSearchService webSearchService;
+    private final FileUrlSigner fileUrlSigner;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<DeepfakeDetectionCreateResponse> createDetection(
@@ -80,6 +82,6 @@ public class DeepfakeDetectionController {
             @PathVariable Long detectionId) {
         DeepfakeDetection detection = deepfakeDetectionService.getDetection(userId, anonymousId, detectionId);
         return ResponseEntity.ok(DeepfakeDetectionResponse.from(detection, webSearchService.find(detectionId),
-                webSearchService.isEnabled()));
+                webSearchService.isEnabled(), fileUrlSigner));
     }
 }

@@ -33,6 +33,9 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(properties = "cors.allowed-origins=http://localhost:3000")
 class AuthControllerReissueTest {
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.signal.global.file.FileUrlSigner fileUrlSigner;
+
     @Autowired
     private MockMvc mockMvc;
 

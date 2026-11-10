@@ -51,6 +51,9 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @TestPropertySource(properties = "cors.allowed-origins=http://localhost:3000")
 class ChatControllerTest {
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.signal.global.file.FileUrlSigner fileUrlSigner;
+
     private static final RequestPostProcessor USER_1 = authentication(new UsernamePasswordAuthenticationToken(
             1L, null, List.of(new SimpleGrantedAuthority("ROLE_USER"))));
 

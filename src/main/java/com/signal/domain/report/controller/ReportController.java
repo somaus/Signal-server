@@ -8,6 +8,7 @@ import com.signal.domain.report.dto.response.ReportStatusResponse;
 import com.signal.domain.report.entity.Report;
 import com.signal.domain.report.entity.ReportEvidence;
 import com.signal.domain.report.service.ReportService;
+import com.signal.global.file.FileUrlSigner;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.CacheControl;
@@ -34,6 +35,7 @@ import org.springframework.web.multipart.MultipartFile;
 public class ReportController {
 
     private final ReportService reportService;
+    private final FileUrlSigner fileUrlSigner;
 
     @PostMapping
     public ResponseEntity<ReportStatusResponse> createReport(
@@ -56,7 +58,7 @@ public class ReportController {
             @AuthenticationPrincipal Long userId,
             @RequestPart("file") MultipartFile file) {
         ReportEvidence evidence = reportService.uploadEvidence(userId, file);
-        return ResponseEntity.status(HttpStatus.CREATED).body(ReportEvidenceResponse.from(evidence));
+        return ResponseEntity.status(HttpStatus.CREATED).body(ReportEvidenceResponse.from(evidence, fileUrlSigner));
     }
 
     @GetMapping("/{reportId}")

@@ -40,6 +40,15 @@ class DeepfakeDetectionControllerWebSearchTest {
     private MockMvc mockMvc;
 
     @MockitoBean
+    private com.signal.global.file.FileUrlSigner fileUrlSigner;
+
+    @org.junit.jupiter.api.BeforeEach
+    void signUrls() {
+        when(fileUrlSigner.sign(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(i -> i.getArgument(0, String.class) + "?exp=1&sig=s");
+    }
+
+    @MockitoBean
     private DeepfakeDetectionService deepfakeDetectionService;
 
     @MockitoBean

@@ -60,6 +60,15 @@ class ReportControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
+    private com.signal.global.file.FileUrlSigner fileUrlSigner;
+
+    @org.junit.jupiter.api.BeforeEach
+    void signUrls() {
+        when(fileUrlSigner.sign(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(i -> i.getArgument(0, String.class) + "?exp=1&sig=s");
+    }
+
+    @MockitoBean
     private ReportService reportService;
 
     @MockitoBean
@@ -197,7 +206,7 @@ class ReportControllerTest {
                         .file(new MockMultipartFile("file", "e.png", "image/png", new byte[] {1})).with(USER_1))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.evidenceId").value(8))
-                .andExpect(jsonPath("$.fileUrl").value("/uploads/e.png"));
+                .andExpect(jsonPath("$.fileUrl").value("/uploads/e.png?exp=1&sig=s"));
     }
 
     @Test

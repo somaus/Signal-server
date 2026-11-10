@@ -48,6 +48,15 @@ class ProtectionControllerTest {
     private MockMvc mockMvc;
 
     @MockitoBean
+    private com.signal.global.file.FileUrlSigner fileUrlSigner;
+
+    @org.junit.jupiter.api.BeforeEach
+    void signUrls() {
+        when(fileUrlSigner.sign(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(i -> i.getArgument(0, String.class) + "?exp=1&sig=s");
+    }
+
+    @MockitoBean
     private ProtectionService protectionService;
 
     @MockitoBean
@@ -101,7 +110,7 @@ class ProtectionControllerTest {
 
         mockMvc.perform(get("/api/v1/protections/5").with(USER_1))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.originalImageUrl").value("/uploads/o.png"))
+                .andExpect(jsonPath("$.originalImageUrl").value("/uploads/o.png?exp=1&sig=s"))
                 .andExpect(jsonPath("$.simulated").value(false));
     }
 
