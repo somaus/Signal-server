@@ -189,6 +189,20 @@ class ChatServiceTest {
     }
 
     @Test
+    void 종료된_세션이라도_위기_메시지는_거절하지_않고_엔진_응답을_내보낸다() {
+        ChatSession session = endedSession();
+        when(chatSessionRepository.findBySessionId("session-1")).thenReturn(Optional.of(session));
+        when(chatEngine.respond(eq("죽고 싶어요"), any())).thenReturn(new ChatEngineResponse(
+                "위기 응답", SituationType.GENERAL, List.of(), true, List.of()));
+        when(chatMessageRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SendMessageResult result = chatService.sendMessage("session-1", 1L, null, "죽고 싶어요");
+
+        assertThat(result.engineResponse().crisisDetected()).isTrue();
+        assertThat(result.sessionEnded()).isTrue();
+    }
+
+    @Test
     void 종료된_세션이라도_남의_세션이면_종료_여부를_알리지_않고_FORBIDDEN이다() {
         ChatSession session = endedSession();
         when(chatSessionRepository.findBySessionId("session-1")).thenReturn(Optional.of(session));
