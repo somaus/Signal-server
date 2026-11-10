@@ -1,5 +1,8 @@
 package com.signal.global.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.signal.global.exception.ErrorCode;
+import com.signal.global.security.SecurityErrorWriter;
 import com.signal.global.file.FileUrlSigner;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -27,6 +30,7 @@ public class WebConfig implements WebMvcConfigurer {
     private String uploadDir;
 
     private final FileUrlSigner fileUrlSigner;
+    private final ObjectMapper objectMapper;
 
     /** 프로필 사진을 뺀 /uploads는 만료되지 않은 올바른 서명이 있어야 열린다. */
     @Override
@@ -39,7 +43,7 @@ public class WebConfig implements WebMvcConfigurer {
                         || fileUrlSigner.verify(path, request.getParameter("exp"), request.getParameter("sig"))) {
                     return true;
                 }
-                response.sendError(HttpServletResponse.SC_FORBIDDEN);
+                SecurityErrorWriter.write(response, objectMapper, ErrorCode.FORBIDDEN);
                 return false;
             }
         }).addPathPatterns("/uploads/**");

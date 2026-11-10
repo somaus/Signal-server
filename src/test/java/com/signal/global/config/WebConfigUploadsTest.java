@@ -1,6 +1,7 @@
 package com.signal.global.config;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.signal.domain.user.repository.UserRepository;
@@ -93,7 +94,8 @@ class WebConfigUploadsTest {
         Path file = Files.createDirectories(UPLOAD_DIR.resolve("evidence")).resolve("e.png");
         Files.write(file, TestFileBytes.PNG);
 
-        mockMvc.perform(get("/uploads/evidence/e.png")).andExpect(status().isForbidden());
+        mockMvc.perform(get("/uploads/evidence/e.png")).andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
         mockMvc.perform(get("/uploads/evidence/e.png?exp=9999999999&sig=bad")).andExpect(status().isForbidden());
         mockMvc.perform(get("/uploads/evidence/e.png?exp=1&sig=bad")).andExpect(status().isForbidden());
         // 다른 파일용으로 받은 서명은 이 파일에 쓸 수 없다.
