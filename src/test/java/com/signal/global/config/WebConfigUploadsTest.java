@@ -104,6 +104,14 @@ class WebConfigUploadsTest {
     }
 
     @Test
+    void 인코딩된_상위_경로로_프로필을_거쳐_민감한_파일을_열_수_없다() throws Exception {
+        mockMvc.perform(get(java.net.URI.create("/uploads/profile/%2e%2e/protections/a.png")))
+                .andExpect(status().isForbidden());
+        mockMvc.perform(get(java.net.URI.create("/uploads/profile/%252e%252e/protections/a.png")))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
     void 프로필_사진은_서명_없이_열린다() throws Exception {
         Path file = Files.createDirectories(UPLOAD_DIR.resolve("profile")).resolve("p.png");
         Files.write(file, TestFileBytes.PNG);

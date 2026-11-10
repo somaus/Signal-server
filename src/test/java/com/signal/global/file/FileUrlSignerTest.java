@@ -73,4 +73,16 @@ class FileUrlSignerTest {
         assertThat(signer.sign("/api/v1/reports/1/document")).isEqualTo("/api/v1/reports/1/document");
         assertThat(signer.requiresSignature("/uploads/profile/../protections/a.png")).isTrue();
     }
+
+    @Test
+    void 인코딩된_상위_경로나_구분자가_있으면_프로필_경로라도_서명이_필요하다() {
+        FileUrlSigner signer = signerAt(NOW);
+
+        assertThat(signer.requiresSignature("/uploads/profile/%2e%2e/protections/a.png")).isTrue();
+        assertThat(signer.requiresSignature("/uploads/profile/%2E%2E%2Fprotections%2Fa.png")).isTrue();
+        assertThat(signer.requiresSignature("/uploads/profile/%252e%252e/protections/a.png")).isTrue();
+        assertThat(signer.requiresSignature("/uploads/profile/..%2Fprotections/a.png")).isTrue();
+        assertThat(signer.requiresSignature("/uploads/profile/sub/a.png")).isTrue();
+        assertThat(signer.requiresSignature("/uploads/profile/a.png")).isFalse();
+    }
 }
