@@ -158,9 +158,10 @@ public class LlmRiskAnalyzer implements RiskAnalyzer {
                         .build(),
                 RiskFactor.builder()
                         .type("REVERSE_SEARCH_RISK")
-                        .label(RiskTexts.label(RiskTexts.REVERSE_SEARCH_RISK, language, "역검색 노출 위험"))
+                        .label(RiskTexts.label(RiskTexts.REVERSE_SEARCH_RISK, language, "노출 가능성(추정)"))
                         .score(clampScore(parsed.reverseSearchRiskScore()))
-                        .description(withScore(parsed.reverseSearchRiskNote(), clampScore(parsed.reverseSearchRiskScore()), language))
+                        .description(RiskTexts.reverseSearchDisclaimer(language) + " "
+                                + withScore(parsed.reverseSearchRiskNote(), clampScore(parsed.reverseSearchRiskScore()), language))
                         .build());
     }
 

@@ -72,10 +72,12 @@ class LlmRiskAnalyzerLanguageTest {
         assertThat(result.factors()).extracting(RiskFactor::getType)
                 .containsExactly("IMAGE_QUALITY", "FACE_EXPOSURE", "METADATA_LEAK", "REVERSE_SEARCH_RISK");
         assertThat(result.factors()).extracting(RiskFactor::getLabel)
-                .containsExactly("Image quality", "Face exposure", "Metadata exposure", "Reverse-search exposure risk");
+                .containsExactly("Image quality", "Face exposure", "Metadata exposure", "Exposure likelihood (estimate)");
         assertThat(result.factors().get(0).getDescription()).isEqualTo("High resolution. (score: 80)");
         assertThat(result.factors().get(2).getDescription())
                 .isEqualTo("No location (GPS) metadata was found in the image file. (score: 10)");
+        assertThat(result.factors().get(3).getDescription())
+                .startsWith("This is an AI estimate based on the image's features, not the result of an actual reverse image search.");
         assertThat(result.recommendations())
                 .isEqualTo(RiskTexts.recommendations(result.overallRiskLevel(), ResponseLanguage.EN));
     }
@@ -92,8 +94,9 @@ class LlmRiskAnalyzerLanguageTest {
         verify(visionCompletionClient).complete(any(byte[].class), anyString(), systemPrompt.capture(), anyString());
         assertThat(systemPrompt.getValue()).doesNotContain("[Response language]");
         assertThat(result.factors()).extracting(RiskFactor::getLabel)
-                .containsExactly("이미지 품질", "얼굴 노출도", "메타데이터 노출", "역검색 노출 위험");
+                .containsExactly("이미지 품질", "얼굴 노출도", "메타데이터 노출", "노출 가능성(추정)");
         assertThat(result.factors().get(0).getDescription()).isEqualTo("High resolution. (점수: 80)");
+        assertThat(result.factors().get(3).getDescription()).startsWith("실제 역이미지 검색 결과가 아니라");
     }
 
     @Test
