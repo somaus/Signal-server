@@ -123,7 +123,7 @@ public class WebSearchService {
     /** 계정을 지울 때 그 사용자의 검색 기록도 지운다. */
     @Transactional
     public void deleteByOwner(Long userId) {
-        webSearchRepository.deleteByOwnerKey("u:" + userId);
+        webSearchRepository.deleteByOwnerKey(WebSearchOwnerKey.user(userId));
     }
 
     /** 보존 기간이 지난 검색 결과(페이지 URL 목록)를 지운다. */

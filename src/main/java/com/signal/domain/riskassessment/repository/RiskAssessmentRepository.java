@@ -5,6 +5,9 @@ import com.signal.domain.riskassessment.entity.RiskAssessmentStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface RiskAssessmentRepository extends JpaRepository<RiskAssessment, Long> {
 
@@ -18,4 +21,13 @@ public interface RiskAssessmentRepository extends JpaRepository<RiskAssessment, 
             String anonymousId, RiskAssessmentStatus status, LocalDateTime createdBefore);
 
     List<RiskAssessment> findByUserIdAndStatusOrderByCreatedAtDesc(Long userId, RiskAssessmentStatus status);
+
+    /**
+     * 비회원으로 만든 분석 기록을 로그인한 회원 것으로 옮긴다. anonymousId는 지우지 않아서 비회원 이용 횟수 집계가
+     * 유지된다(소유 판정은 userId를 먼저 본다). 반환값은 옮긴 건수다.
+     */
+    @Modifying
+    @Query("update RiskAssessment r set r.userId = :userId "
+            + "where r.anonymousId = :anonymousId and r.userId is null")
+    int claimByAnonymousId(@Param("anonymousId") String anonymousId, @Param("userId") Long userId);
 }

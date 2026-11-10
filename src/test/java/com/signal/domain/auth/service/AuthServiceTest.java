@@ -3,6 +3,8 @@ package com.signal.domain.auth.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.signal.domain.auth.dto.request.LoginRequest;
@@ -12,6 +14,7 @@ import com.signal.domain.auth.entity.RefreshToken;
 import com.signal.domain.auth.repository.RefreshTokenRepository;
 import com.signal.domain.user.entity.User;
 import com.signal.domain.user.repository.UserRepository;
+import com.signal.domain.user.service.AnonymousRecordClaimer;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.security.jwt.JwtProvider;
@@ -45,6 +48,9 @@ class AuthServiceTest {
     @Mock
     private RefreshTokenRepository refreshTokenRepository;
 
+    @Mock
+    private AnonymousRecordClaimer anonymousRecordClaimer;
+
     /** 리프레시 토큰 저장소를 메모리로 흉내 내, 회전과 폐기가 실제 흐름대로 이어지는지 확인한다. */
     private final Map<String, RefreshToken> stored = new LinkedHashMap<>();
 
@@ -62,7 +68,7 @@ class AuthServiceTest {
         ReflectionTestUtils.invokeMethod(jwtProvider, "init");
 
         authService = new AuthService(userRepository, passwordEncoder, jwtProvider, verificationService,
-                refreshTokenRepository);
+                refreshTokenRepository, anonymousRecordClaimer);
         ReflectionTestUtils.setField(authService, "accessTokenExpiration", 3_600_000L);
         ReflectionTestUtils.setField(authService, "refreshReuseGraceSeconds", 15L);
 
@@ -105,6 +111,24 @@ class AuthServiceTest {
         assertThatThrownBy(() -> authService.reissue(refreshToken))
                 .isInstanceOfSatisfying(SignalException.class,
                         e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.INVALID_REFRESH_TOKEN));
+    }
+
+    @Test
+    void 로그인하면_익명_식별자의_비회원_기록을_이_계정으로_옮긴다() {
+        authService.login(new LoginRequest("user@example.com", "pw"), "anon-1");
+
+        verify(anonymousRecordClaimer).claim(USER_ID, "anon-1");
+    }
+
+    @Test
+    void 로그인에_실패하면_비회원_기록을_옮기지_않는다() {
+        when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("user@example.com", "wrong"), "anon-1"))
+                .isInstanceOfSatisfying(SignalException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.LOGIN_FAILED));
+        verify(anonymousRecordClaimer, never()).claim(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
     }
 
     @Test
