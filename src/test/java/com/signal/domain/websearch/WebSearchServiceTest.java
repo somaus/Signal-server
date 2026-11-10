@@ -180,4 +180,58 @@ class WebSearchServiceTest {
 
         verify(repository).deleteByOwnerKey("u:7");
     }
+
+    @Test
+    void 분석의_검색은_기능이_꺼져_있으면_DISABLED로_돌려주고_아무것도_저장하지_않는다() {
+        var outcome = service(null).searchForAssessment("u:1", new byte[] {1});
+
+        assertThat(outcome.status()).isEqualTo(WebSearchStatus.UNAVAILABLE);
+        assertThat(outcome.reason()).isEqualTo(UnavailableReason.DISABLED);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void 분석의_검색은_한도에_닿으면_탐지_id_없는_UNAVAILABLE_행을_남기고_검색하지_않는다() {
+        when(repository.countByCreatedAtGreaterThanEqualAndStatusNot(any(), eq(WebSearchStatus.UNAVAILABLE))).thenReturn(3L);
+
+        var outcome = service(searcher).searchForAssessment("u:1", new byte[] {1});
+
+        assertThat(outcome.status()).isEqualTo(WebSearchStatus.UNAVAILABLE);
+        assertThat(outcome.reason()).isEqualTo(UnavailableReason.DAILY_LIMIT);
+        ArgumentCaptor<WebSearch> saved = ArgumentCaptor.forClass(WebSearch.class);
+        verify(repository).save(saved.capture());
+        assertThat(saved.getValue().getDetectionId()).isNull();
+        verify(searcher, never()).search(any());
+    }
+
+    @Test
+    void 분석의_검색은_찾은_페이지를_같은_이미지와_비슷한_이미지로_세고_주소는_저장하지_않는다() {
+        when(repository.save(any(WebSearch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(searcher.search(any())).thenReturn(List.of(
+                new SearchHit("https://a.example/1", null, "가", MatchType.FULL),
+                new SearchHit("https://a.example/2", null, "나", MatchType.PARTIAL),
+                new SearchHit("https://a.example/3", null, "다", MatchType.SIMILAR),
+                new SearchHit("https://a.example/4", null, "라", MatchType.PAGE)));
+
+        var outcome = service(searcher).searchForAssessment("u:1", new byte[] {1});
+
+        assertThat(outcome.isCompleted()).isTrue();
+        assertThat(outcome.sameImageCount()).isEqualTo(2);
+        assertThat(outcome.similarImageCount()).isEqualTo(2);
+        ArgumentCaptor<WebSearch> saved = ArgumentCaptor.forClass(WebSearch.class);
+        verify(repository, org.mockito.Mockito.atLeastOnce()).save(saved.capture());
+        WebSearch last = saved.getAllValues().get(saved.getAllValues().size() - 1);
+        assertThat(last.getStatus()).isEqualTo(WebSearchStatus.COMPLETED);
+        assertThat(last.getMatches()).isEmpty();
+    }
+
+    @Test
+    void 분석의_검색이_예외로_실패하면_FAILED로_기록하고_FAILED를_돌려준다() {
+        when(repository.save(any(WebSearch.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(searcher.search(any())).thenThrow(new IllegalStateException("검색 서버 오류"));
+
+        var outcome = service(searcher).searchForAssessment("u:1", new byte[] {1});
+
+        assertThat(outcome.status()).isEqualTo(WebSearchStatus.FAILED);
+    }
 }

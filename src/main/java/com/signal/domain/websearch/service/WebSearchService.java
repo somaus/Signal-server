@@ -1,6 +1,8 @@
 package com.signal.domain.websearch.service;
 
+import com.signal.domain.monitoring.entity.MatchType;
 import com.signal.domain.monitoring.monitor.ReverseImageSearcher;
+import com.signal.domain.monitoring.monitor.ReverseImageSearcher.SearchHit;
 import com.signal.domain.websearch.entity.UnavailableReason;
 import com.signal.domain.websearch.entity.WebSearch;
 import com.signal.domain.websearch.entity.WebSearchStatus;
@@ -9,6 +11,7 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.ObjectProvider;
@@ -107,6 +110,39 @@ public class WebSearchService {
             return UnavailableReason.MONTHLY_LIMIT;
         }
         return null;
+    }
+
+    /**
+     * 위험도 분석에서 사용자가 동의해 하는 검색. 호출한 스레드(분석 작업)에서 바로 수행하고 결과 건수만 돌려준다.
+     * 한도는 탐지의 검색과 같은 표(web_searches)로 세므로 탐지 id 없는 행을 남기며, 찾은 페이지 주소는 저장하지 않는다.
+     */
+    public AssessmentSearchOutcome searchForAssessment(String ownerKey, byte[] image) {
+        if (searcher == null) {
+            return AssessmentSearchOutcome.unavailable(UnavailableReason.DISABLED);
+        }
+        WebSearch row;
+        synchronized (startLock) {
+            UnavailableReason reason = unavailableReason(false, ownerKey);
+            if (reason != null) {
+                log.warn("분석의 웹 검색을 하지 않습니다: 이유={}", reason);
+                webSearchRepository.save(WebSearch.unavailable(null, ownerKey, reason));
+                return AssessmentSearchOutcome.unavailable(reason);
+            }
+            row = webSearchRepository.save(WebSearch.processing(null, ownerKey));
+        }
+        try {
+            List<SearchHit> hits = searcher.search(image);
+            row.complete(List.of());
+            webSearchRepository.save(row);
+            int same = (int) hits.stream().filter(hit -> hit.matchType() == MatchType.FULL
+                    || hit.matchType() == MatchType.PARTIAL).count();
+            return AssessmentSearchOutcome.completed(same, hits.size() - same);
+        } catch (Exception e) {
+            row.fail();
+            webSearchRepository.save(row);
+            log.error("분석의 웹 검색 실패: 원인={}", e.toString());
+            return AssessmentSearchOutcome.failed();
+        }
     }
 
     /** 서버가 검색 도중 재시작되면 PROCESSING이 남으므로, 오래된 것은 FAILED로 정리해 돌려준다. */

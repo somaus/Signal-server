@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
@@ -29,8 +30,10 @@ public class RiskAssessmentController {
     public ResponseEntity<RiskAssessmentResponse> createAssessment(
             @AuthenticationPrincipal Long userId,
             @RequestHeader(value = "X-Anonymous-Id", required = false) String anonymousId,
-            @RequestPart("image") MultipartFile image) {
-        RiskAssessment riskAssessment = riskAssessmentService.createAssessment(userId, anonymousId, image);
+            @RequestPart("image") MultipartFile image,
+            @RequestParam(value = "webSearchConsent", defaultValue = "false") boolean webSearchConsent) {
+        RiskAssessment riskAssessment =
+                riskAssessmentService.createAssessment(userId, anonymousId, image, webSearchConsent);
         return ResponseEntity.status(HttpStatus.ACCEPTED).body(RiskAssessmentResponse.from(riskAssessment));
     }
 

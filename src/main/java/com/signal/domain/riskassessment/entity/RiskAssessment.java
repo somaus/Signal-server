@@ -13,6 +13,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
+import com.signal.domain.websearch.entity.UnavailableReason;
+import com.signal.domain.websearch.entity.WebSearchStatus;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -81,6 +83,20 @@ public class RiskAssessment {
     @Column(length = 30)
     private AssessmentFailureReason failureReason;
 
+    /** 사용자가 업로드할 때 웹 역검색에 동의했는지. 동의한 분석만 사진이 외부 검색 서비스로 전송된다(#55). */
+    @Column(nullable = false)
+    private boolean webSearchConsent;
+
+    /** 동의했을 때만 채워진다. COMPLETED면 실제 검색 결과가 점수에 반영됐고, 그 밖이면 추정치 그대로다. */
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private WebSearchStatus webSearchStatus;
+
+    /** webSearchStatus가 UNAVAILABLE일 때의 이유. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "web_search_reason", length = 20)
+    private UnavailableReason webSearchUnavailableReason;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -106,7 +122,12 @@ public class RiskAssessment {
 
     /** 사진을 접수한 직후의 상태. 분석 결과는 비어 있고 {@link #complete} 또는 {@link #fail}로 마무리한다. */
     public static RiskAssessment processing(Long userId, String anonymousId, String imageUrl) {
-        return RiskAssessment.builder()
+        return processing(userId, anonymousId, imageUrl, false);
+    }
+
+    public static RiskAssessment processing(Long userId, String anonymousId, String imageUrl,
+                                            boolean webSearchConsent) {
+        RiskAssessment assessment = RiskAssessment.builder()
                 .userId(userId)
                 .anonymousId(anonymousId)
                 .imageUrl(imageUrl)
@@ -117,6 +138,14 @@ public class RiskAssessment {
                 .fallbackUsed(false)
                 .status(RiskAssessmentStatus.PROCESSING)
                 .build();
+        assessment.webSearchConsent = webSearchConsent;
+        return assessment;
+    }
+
+    /** 동의한 분석의 웹 검색 결과(성공·한도·실패)를 기록한다. */
+    public void recordWebSearch(WebSearchStatus status, UnavailableReason unavailableReason) {
+        this.webSearchStatus = status;
+        this.webSearchUnavailableReason = unavailableReason;
     }
 
     public void complete(RiskLevel overallRiskLevel, int overallScore, boolean faceDetected,

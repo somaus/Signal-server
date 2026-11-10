@@ -2,12 +2,18 @@ package com.signal.domain.riskassessment.service;
 
 import com.signal.domain.riskassessment.analyzer.RiskAnalysisResult;
 import com.signal.domain.riskassessment.analyzer.RiskAnalyzer;
+import com.signal.domain.riskassessment.analyzer.RiskResultAdjuster;
+import com.signal.domain.riskassessment.entity.RiskAssessment;
 import com.signal.domain.riskassessment.entity.AssessmentFailureReason;
 import com.signal.domain.riskassessment.entity.RiskAssessmentStatus;
 import com.signal.domain.riskassessment.repository.RiskAssessmentRepository;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
+import com.signal.domain.websearch.service.AssessmentSearchOutcome;
+import com.signal.domain.websearch.service.WebSearchOwnerKey;
+import com.signal.domain.websearch.service.WebSearchService;
 import com.signal.global.file.InMemoryMultipartFile;
+import com.signal.global.i18n.LanguageContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Async;
@@ -26,6 +32,7 @@ public class RiskAssessmentProcessor {
 
     private final RiskAnalyzer riskAnalyzer;
     private final RiskAssessmentRepository riskAssessmentRepository;
+    private final WebSearchService webSearchService;
 
     @Async
     public void process(Long assessmentId, String filename, String contentType, byte[] content) {
@@ -37,7 +44,12 @@ public class RiskAssessmentProcessor {
                 markFailed(assessmentId, AssessmentFailureReason.NO_FACE_DETECTED);
                 return;
             }
-            markCompleted(assessmentId, result);
+            AssessmentSearchOutcome search = searchIfConsented(assessmentId, content, result);
+            if (search != null && search.isCompleted()) {
+                result = RiskResultAdjuster.apply(result, search.sameImageCount(), search.similarImageCount(),
+                        LanguageContext.current());
+            }
+            markCompleted(assessmentId, result, search);
         } catch (SignalException e) {
             AssessmentFailureReason reason = failureReasonOf(e.getErrorCode());
             log.warn("위험도 분석 실패: assessmentId={}, reason={}", assessmentId, reason, e);
@@ -56,7 +68,30 @@ public class RiskAssessmentProcessor {
         };
     }
 
-    private void markCompleted(Long assessmentId, RiskAnalysisResult result) {
+    /**
+     * 사용자가 업로드할 때 동의했고 폴백 결과가 아니면 실제 웹 역검색을 한다. 동의하지 않았거나 검색 대상이 아니면 null이다.
+     * 검색이 실패하거나 한도에 닿아도 분석 자체는 추정치 그대로 완료한다.
+     */
+    private AssessmentSearchOutcome searchIfConsented(Long assessmentId, byte[] content, RiskAnalysisResult result) {
+        if (result.fallbackUsed()) {
+            return null;
+        }
+        RiskAssessment assessment = riskAssessmentRepository.findById(assessmentId).orElse(null);
+        if (assessment == null || !assessment.isWebSearchConsent()) {
+            return null;
+        }
+        String ownerKey = assessment.getUserId() != null
+                ? WebSearchOwnerKey.user(assessment.getUserId())
+                : WebSearchOwnerKey.anonymous(assessment.getAnonymousId());
+        try {
+            return webSearchService.searchForAssessment(ownerKey, content);
+        } catch (Exception e) {
+            log.error("분석의 웹 검색 중 예상하지 못한 오류: assessmentId={}, 원인={}", assessmentId, e.toString());
+            return AssessmentSearchOutcome.failed();
+        }
+    }
+
+    private void markCompleted(Long assessmentId, RiskAnalysisResult result, AssessmentSearchOutcome search) {
         riskAssessmentRepository.findById(assessmentId).ifPresent(assessment -> {
             if (assessment.getStatus() != RiskAssessmentStatus.PROCESSING) {
                 // 조회 시점에 이미 TIMEOUT으로 정리된 건이 뒤늦게 COMPLETED로 되살아나지 않게 한다.
@@ -66,6 +101,9 @@ public class RiskAssessmentProcessor {
             }
             assessment.complete(result.overallRiskLevel(), result.overallScore(), true, result.factors(),
                     result.recommendations(), result.faces(), result.fallbackUsed());
+            if (search != null) {
+                assessment.recordWebSearch(search.status(), search.reason());
+            }
             riskAssessmentRepository.save(assessment);
         });
     }

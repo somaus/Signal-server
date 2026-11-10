@@ -1,6 +1,7 @@
 package com.signal.global.ratelimit;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -68,7 +69,7 @@ class AnonymousIpRateLimitConfigTest {
 
     @Test
     void 같은_IP가_익명_ID를_바꿔도_한도를_넘으면_429다_로그인_사용자는_영향이_없다() throws Exception {
-        when(riskAssessmentService.createAssessment(any(), any(), any()))
+        when(riskAssessmentService.createAssessment(any(), any(), any(), anyBoolean()))
                 .thenReturn(RiskAssessment.processing(null, "a", "/uploads/a.png"));
 
         post("anon-1", null, 202);

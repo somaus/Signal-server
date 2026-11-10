@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.signal.domain.riskassessment.analyzer.RiskAnalysisResult;
@@ -17,6 +18,10 @@ import com.signal.domain.riskassessment.entity.RiskAssessmentStatus;
 import com.signal.domain.riskassessment.entity.RiskFactor;
 import com.signal.domain.riskassessment.entity.RiskLevel;
 import com.signal.domain.riskassessment.repository.RiskAssessmentRepository;
+import com.signal.domain.websearch.entity.UnavailableReason;
+import com.signal.domain.websearch.entity.WebSearchStatus;
+import com.signal.domain.websearch.service.AssessmentSearchOutcome;
+import com.signal.domain.websearch.service.WebSearchService;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import java.util.List;
@@ -39,12 +44,15 @@ class RiskAssessmentProcessorTest {
     @Mock
     private RiskAssessmentRepository riskAssessmentRepository;
 
+    @Mock
+    private WebSearchService webSearchService;
+
     private RiskAssessmentProcessor processor;
     private RiskAssessment assessment;
 
     @BeforeEach
     void setUp() {
-        processor = new RiskAssessmentProcessor(riskAnalyzer, riskAssessmentRepository);
+        processor = new RiskAssessmentProcessor(riskAnalyzer, riskAssessmentRepository, webSearchService);
         assessment = RiskAssessment.processing(1L, null, "/uploads/risk-assessments/a.png");
         lenient().when(riskAssessmentRepository.findById(7L)).thenReturn(Optional.of(assessment));
     }
@@ -180,5 +188,97 @@ class RiskAssessmentProcessorTest {
         processor.process(8L, "photo.png", "image/png", CONTENT);
 
         verify(riskAssessmentRepository, never()).save(any());
+    }
+
+    private RiskAnalysisResult llmResult(boolean fallbackUsed) {
+        List<RiskFactor> factors = List.of(
+                RiskFactor.builder().type("IMAGE_QUALITY").label("이미지 품질").score(80).description("설명").build(),
+                RiskFactor.builder().type("FACE_EXPOSURE").label("얼굴 노출도").score(60).description("설명").build(),
+                RiskFactor.builder().type("METADATA_LEAK").label("메타데이터 노출").score(10).description("설명").build(),
+                RiskFactor.builder().type("REVERSE_SEARCH_RISK").label("노출 가능성(추정)").score(30).description("설명")
+                        .build());
+        return new RiskAnalysisResult(true, RiskLevel.MEDIUM, 45, factors, List.of("권고"), List.of(), fallbackUsed);
+    }
+
+    @Test
+    void 웹_검색에_동의했고_검색이_끝나면_역검색_항목을_검색_결과로_바꾸고_기록한다() {
+        assessment = RiskAssessment.processing(1L, null, "/uploads/risk-assessments/a.png", true);
+        when(riskAssessmentRepository.findById(7L)).thenReturn(Optional.of(assessment));
+        when(riskAnalyzer.analyze(any(MultipartFile.class))).thenReturn(llmResult(false));
+        when(webSearchService.searchForAssessment("u:1", CONTENT)).thenReturn(AssessmentSearchOutcome.completed(2, 0));
+
+        processor.process(7L, "photo.png", "image/png", CONTENT);
+
+        assertThat(assessment.getStatus()).isEqualTo(RiskAssessmentStatus.COMPLETED);
+        assertThat(assessment.getFactors()).extracting(RiskFactor::getType)
+                .contains("REVERSE_SEARCH_RESULT").doesNotContain("REVERSE_SEARCH_RISK");
+        assertThat(assessment.getOverallScore()).isEqualTo(58);
+        assertThat(assessment.getWebSearchStatus()).isEqualTo(WebSearchStatus.COMPLETED);
+    }
+
+    @Test
+    void 비회원은_익명_식별자로_한도를_센다() {
+        assessment = RiskAssessment.processing(null, "anon-9", "/uploads/risk-assessments/a.png", true);
+        when(riskAssessmentRepository.findById(7L)).thenReturn(Optional.of(assessment));
+        when(riskAnalyzer.analyze(any(MultipartFile.class))).thenReturn(llmResult(false));
+        when(webSearchService.searchForAssessment("a:anon-9", CONTENT)).thenReturn(AssessmentSearchOutcome.completed(0, 1));
+
+        processor.process(7L, "photo.png", "image/png", CONTENT);
+
+        assertThat(assessment.getWebSearchStatus()).isEqualTo(WebSearchStatus.COMPLETED);
+    }
+
+    @Test
+    void 한도에_닿아_검색하지_못하면_추정_항목과_점수를_그대로_두고_이유를_기록한다() {
+        assessment = RiskAssessment.processing(1L, null, "/uploads/risk-assessments/a.png", true);
+        when(riskAssessmentRepository.findById(7L)).thenReturn(Optional.of(assessment));
+        when(riskAnalyzer.analyze(any(MultipartFile.class))).thenReturn(llmResult(false));
+        when(webSearchService.searchForAssessment("u:1", CONTENT))
+                .thenReturn(AssessmentSearchOutcome.unavailable(UnavailableReason.DAILY_LIMIT));
+
+        processor.process(7L, "photo.png", "image/png", CONTENT);
+
+        assertThat(assessment.getStatus()).isEqualTo(RiskAssessmentStatus.COMPLETED);
+        assertThat(assessment.getFactors()).extracting(RiskFactor::getType).contains("REVERSE_SEARCH_RISK");
+        assertThat(assessment.getOverallScore()).isEqualTo(45);
+        assertThat(assessment.getWebSearchStatus()).isEqualTo(WebSearchStatus.UNAVAILABLE);
+        assertThat(assessment.getWebSearchUnavailableReason()).isEqualTo(UnavailableReason.DAILY_LIMIT);
+    }
+
+    @Test
+    void 웹_검색이_예상하지_못한_오류로_실패해도_분석은_추정치로_완료한다() {
+        assessment = RiskAssessment.processing(1L, null, "/uploads/risk-assessments/a.png", true);
+        when(riskAssessmentRepository.findById(7L)).thenReturn(Optional.of(assessment));
+        when(riskAnalyzer.analyze(any(MultipartFile.class))).thenReturn(llmResult(false));
+        when(webSearchService.searchForAssessment("u:1", CONTENT)).thenThrow(new IllegalStateException("검색 서버 오류"));
+
+        processor.process(7L, "photo.png", "image/png", CONTENT);
+
+        assertThat(assessment.getStatus()).isEqualTo(RiskAssessmentStatus.COMPLETED);
+        assertThat(assessment.getOverallScore()).isEqualTo(45);
+        assertThat(assessment.getWebSearchStatus()).isEqualTo(WebSearchStatus.FAILED);
+    }
+
+    @Test
+    void 동의하지_않았으면_웹_검색을_하지_않는다() {
+        when(riskAnalyzer.analyze(any(MultipartFile.class))).thenReturn(llmResult(false));
+
+        processor.process(7L, "photo.png", "image/png", CONTENT);
+
+        verifyNoInteractions(webSearchService);
+        assertThat(assessment.getWebSearchStatus()).isNull();
+        assertThat(assessment.getOverallScore()).isEqualTo(45);
+    }
+
+    @Test
+    void 폴백_결과에는_동의했어도_웹_검색을_하지_않는다() {
+        assessment = RiskAssessment.processing(1L, null, "/uploads/risk-assessments/a.png", true);
+        when(riskAssessmentRepository.findById(7L)).thenReturn(Optional.of(assessment));
+        when(riskAnalyzer.analyze(any(MultipartFile.class))).thenReturn(llmResult(true));
+
+        processor.process(7L, "photo.png", "image/png", CONTENT);
+
+        verifyNoInteractions(webSearchService);
+        assertThat(assessment.getWebSearchStatus()).isNull();
     }
 }

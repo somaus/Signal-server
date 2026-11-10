@@ -1,8 +1,10 @@
 package com.signal.domain.riskassessment.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication;
@@ -76,13 +78,26 @@ class RiskAssessmentControllerTest {
 
     @Test
     void 비회원이_사진을_올리면_202와_PROCESSING을_반환한다() throws Exception {
-        when(riskAssessmentService.createAssessment(isNull(), eq("anon-1"), any())).thenReturn(processing());
+        when(riskAssessmentService.createAssessment(isNull(), eq("anon-1"), any(), eq(false)))
+                .thenReturn(processing());
 
         mockMvc.perform(multipart("/api/v1/risk-assessments").file(image()).header("X-Anonymous-Id", "anon-1"))
                 .andExpect(status().isAccepted())
                 .andExpect(jsonPath("$.assessmentId").value(6))
                 .andExpect(jsonPath("$.status").value("PROCESSING"))
                 .andExpect(jsonPath("$.overallScore").doesNotExist());
+    }
+
+    @Test
+    void 웹_검색에_동의했다고_보내면_서비스에_동의가_전달된다() throws Exception {
+        when(riskAssessmentService.createAssessment(isNull(), eq("anon-1"), any(), eq(true)))
+                .thenReturn(processing());
+
+        mockMvc.perform(multipart("/api/v1/risk-assessments").file(image()).header("X-Anonymous-Id", "anon-1")
+                        .param("webSearchConsent", "true"))
+                .andExpect(status().isAccepted());
+
+        verify(riskAssessmentService).createAssessment(isNull(), eq("anon-1"), any(), eq(true));
     }
 
     @Test
@@ -94,7 +109,7 @@ class RiskAssessmentControllerTest {
 
     @Test
     void 비회원_이용_횟수를_넘으면_429다() throws Exception {
-        when(riskAssessmentService.createAssessment(any(), any(), any()))
+        when(riskAssessmentService.createAssessment(any(), any(), any(), anyBoolean()))
                 .thenThrow(new SignalException(ErrorCode.ANONYMOUS_RISK_ASSESSMENT_LIMIT_EXCEEDED));
 
         mockMvc.perform(multipart("/api/v1/risk-assessments").file(image()).header("X-Anonymous-Id", "anon-1"))
