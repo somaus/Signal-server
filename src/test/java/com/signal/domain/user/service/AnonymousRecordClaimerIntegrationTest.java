@@ -10,6 +10,9 @@ import com.signal.domain.riskassessment.entity.AssessmentFailureReason;
 import com.signal.domain.riskassessment.entity.RiskAssessment;
 import com.signal.domain.riskassessment.entity.RiskAssessmentStatus;
 import com.signal.domain.riskassessment.repository.RiskAssessmentRepository;
+import com.signal.domain.websearch.entity.WebSearch;
+import com.signal.domain.websearch.repository.WebSearchRepository;
+import com.signal.domain.websearch.service.WebSearchOwnerKey;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -46,6 +49,9 @@ class AnonymousRecordClaimerIntegrationTest {
     private ChatSessionRepository chatSessionRepository;
 
     @Autowired
+    private WebSearchRepository webSearchRepository;
+
+    @Autowired
     private TestEntityManager entityManager;
 
     private RiskAssessment guestAssessment(String anonymousId, boolean failed) {
@@ -57,7 +63,7 @@ class AnonymousRecordClaimerIntegrationTest {
     }
 
     @Test
-    void 끝난_위험도_분석은_회원으로_옮기고_식별자를_비운다() {
+    void 끝난_위험도_분석은_회원으로_옮기고_비회원_식별자는_남긴다() {
         RiskAssessment done = guestAssessment(ANON, true);
 
         claimer.claim(USER_ID, ANON);
@@ -65,21 +71,31 @@ class AnonymousRecordClaimerIntegrationTest {
 
         RiskAssessment stored = riskAssessmentRepository.findById(done.getId()).orElseThrow();
         assertThat(stored.getUserId()).isEqualTo(USER_ID);
-        assertThat(stored.getAnonymousId()).isNull();
+        assertThat(stored.getAnonymousId()).isEqualTo(ANON);
     }
 
     @Test
-    void 처리_중인_분석과_다른_식별자의_기록은_옮기지_않는다() {
+    void 옮긴_뒤에도_비회원_이용_횟수에는_계속_잡힌다() {
+        guestAssessment(ANON, false);
+
+        claimer.claim(USER_ID, ANON);
+        entityManager.clear();
+
+        assertThat(riskAssessmentRepository.countByAnonymousIdAndStatusNot(ANON, RiskAssessmentStatus.FAILED))
+                .isEqualTo(1);
+    }
+
+    @Test
+    void 처리_중인_분석도_옮기고_다른_식별자의_기록은_옮기지_않는다() {
         RiskAssessment processing = guestAssessment(ANON, false);
         RiskAssessment others = guestAssessment("anon-2", true);
 
         claimer.claim(USER_ID, ANON);
         entityManager.clear();
 
-        RiskAssessment stillProcessing = riskAssessmentRepository.findById(processing.getId()).orElseThrow();
-        assertThat(stillProcessing.getStatus()).isEqualTo(RiskAssessmentStatus.PROCESSING);
-        assertThat(stillProcessing.getUserId()).isNull();
-        assertThat(stillProcessing.getAnonymousId()).isEqualTo(ANON);
+        RiskAssessment moved = riskAssessmentRepository.findById(processing.getId()).orElseThrow();
+        assertThat(moved.getStatus()).isEqualTo(RiskAssessmentStatus.PROCESSING);
+        assertThat(moved.getUserId()).isEqualTo(USER_ID);
         assertThat(riskAssessmentRepository.findById(others.getId()).orElseThrow().getUserId()).isNull();
     }
 
@@ -90,13 +106,13 @@ class AnonymousRecordClaimerIntegrationTest {
         mine.fail(AssessmentFailureReason.TIMEOUT);
         riskAssessmentRepository.saveAndFlush(mine);
 
-        int claimed = riskAssessmentRepository.claimByAnonymousId(ANON, USER_ID, RiskAssessmentStatus.PROCESSING);
+        int claimed = riskAssessmentRepository.claimByAnonymousId(ANON, USER_ID);
 
         assertThat(claimed).isZero();
     }
 
     @Test
-    void 탐지_기록은_처리_중이_아닌_것만_옮긴다() {
+    void 탐지_기록은_처리_중인_것도_옮긴다() {
         DeepfakeDetection processing = deepfakeDetectionRepository.saveAndFlush(
                 DeepfakeDetection.builder().anonymousId(ANON).fileUrl("/uploads/c.png").build());
         DeepfakeDetection failed = DeepfakeDetection.builder().anonymousId(ANON).fileUrl("/uploads/d.png").build();
@@ -108,7 +124,33 @@ class AnonymousRecordClaimerIntegrationTest {
 
         assertThat(deepfakeDetectionRepository.findById(failed.getId()).orElseThrow().getUserId())
                 .isEqualTo(USER_ID);
-        assertThat(deepfakeDetectionRepository.findById(processing.getId()).orElseThrow().getUserId()).isNull();
+        assertThat(deepfakeDetectionRepository.findById(processing.getId()).orElseThrow().getUserId())
+                .isEqualTo(USER_ID);
+    }
+
+    @Test
+    void 옮긴_탐지의_웹_검색_기록은_회원_것이_되어_탈퇴_때_지워진다() {
+        DeepfakeDetection detection = deepfakeDetectionRepository.saveAndFlush(
+                DeepfakeDetection.builder().anonymousId(ANON).fileUrl("/uploads/e.png").build());
+        webSearchRepository.saveAndFlush(WebSearch.processing(detection.getId(), WebSearchOwnerKey.anonymous(ANON)));
+        webSearchRepository.saveAndFlush(
+                WebSearch.processing(detection.getId() + 100, WebSearchOwnerKey.anonymous("anon-2")));
+
+        claimer.claim(USER_ID, ANON);
+        entityManager.clear();
+
+        assertThat(webSearchRepository.findByDetectionId(detection.getId()).orElseThrow().getOwnerKey())
+                .isEqualTo(WebSearchOwnerKey.user(USER_ID));
+        assertThat(webSearchRepository.findByDetectionId(detection.getId() + 100).orElseThrow().getOwnerKey())
+                .isEqualTo(WebSearchOwnerKey.anonymous("anon-2"));
+
+        // 회원 탈퇴 때 WebSearchService.deleteByOwner가 하는 일
+        webSearchRepository.deleteByOwnerKey(WebSearchOwnerKey.user(USER_ID));
+        entityManager.flush();
+        entityManager.clear();
+
+        assertThat(webSearchRepository.findByDetectionId(detection.getId())).isEmpty();
+        assertThat(webSearchRepository.findByDetectionId(detection.getId() + 100)).isPresent();
     }
 
     @Test
@@ -123,7 +165,7 @@ class AnonymousRecordClaimerIntegrationTest {
 
         ChatSession moved = chatSessionRepository.findById(consented.getId()).orElseThrow();
         assertThat(moved.getUserId()).isEqualTo(USER_ID);
-        assertThat(moved.getAnonymousId()).isNull();
+        assertThat(moved.getAnonymousId()).isEqualTo(ANON);
         ChatSession kept = chatSessionRepository.findById(declined.getId()).orElseThrow();
         assertThat(kept.getUserId()).isNull();
         assertThat(kept.getAnonymousId()).isEqualTo(ANON);

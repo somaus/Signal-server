@@ -23,12 +23,11 @@ public interface RiskAssessmentRepository extends JpaRepository<RiskAssessment, 
     List<RiskAssessment> findByUserIdAndStatusOrderByCreatedAtDesc(Long userId, RiskAssessmentStatus status);
 
     /**
-     * 비회원으로 만든 분석 기록을 로그인한 회원 것으로 옮긴다. 분석이 끝나지 않은 건은 백그라운드 처리가
-     * 엔티티를 통째로 다시 저장하므로 옮기지 않는다(옮긴 userId가 되돌려질 수 있다). 반환값은 옮긴 건수다.
+     * 비회원으로 만든 분석 기록을 로그인한 회원 것으로 옮긴다. anonymousId는 지우지 않아서 비회원 이용 횟수 집계가
+     * 유지된다(소유 판정은 userId를 먼저 본다). 반환값은 옮긴 건수다.
      */
     @Modifying
-    @Query("update RiskAssessment r set r.userId = :userId, r.anonymousId = null "
-            + "where r.anonymousId = :anonymousId and r.userId is null and r.status <> :excluded")
-    int claimByAnonymousId(@Param("anonymousId") String anonymousId, @Param("userId") Long userId,
-            @Param("excluded") RiskAssessmentStatus excluded);
+    @Query("update RiskAssessment r set r.userId = :userId "
+            + "where r.anonymousId = :anonymousId and r.userId is null")
+    int claimByAnonymousId(@Param("anonymousId") String anonymousId, @Param("userId") Long userId);
 }
