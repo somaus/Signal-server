@@ -49,6 +49,9 @@ public enum ErrorCode {
     // 얼굴 도용 모니터링
     MONITORING_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "등록할 수 있는 모니터링 수를 초과했습니다. 기존 모니터링을 삭제한 뒤 다시 시도해주세요."),
 
+    // 상담
+    CHAT_SESSION_ENDED(HttpStatus.CONFLICT, "이미 종료된 상담입니다. 새 상담을 시작해주세요."),
+
     // 신고 문서
     REQUIRED_FIELD_MISSING(HttpStatus.BAD_REQUEST, "필수 항목이 누락되었습니다."),
     REPORT_ALREADY_FINALIZED(HttpStatus.CONFLICT, "이미 확정된 신고서는 수정할 수 없습니다.");

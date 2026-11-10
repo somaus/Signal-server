@@ -73,6 +73,10 @@ public class ChatService {
     @Transactional
     public SendMessageResult sendMessage(String sessionId, Long userId, String anonymousId, String content) {
         ChatSession session = getOwnedSession(sessionId, userId, anonymousId);
+        // 종료된 상담에는 답변을 만들지 않는다. LLM 호출과 메시지 저장 전에 거절하고, 트랜잭션도 롤백된다.
+        if (session.isSessionEnded()) {
+            throw new SignalException(ErrorCode.CHAT_SESSION_ENDED);
+        }
         List<ChatTurn> history = buildHistory(session.getId());
         // 단계 판정에는 LLM에 넘기는 최근 10개가 아니라 세션 전체의 사용자 메시지 수를 쓴다(이번 메시지 포함).
         int userTurns = (int) chatMessageRepository.countByChatSessionIdAndRole(session.getId(), ChatRole.USER) + 1;
@@ -182,9 +186,11 @@ public class ChatService {
                 engineResponse.crisisDetected(), agencies);
     }
 
-    public List<ChatMessage> getMessages(String sessionId, Long userId, String anonymousId) {
+    public ChatMessagesResult getMessages(String sessionId, Long userId, String anonymousId) {
         ChatSession session = getOwnedSession(sessionId, userId, anonymousId);
-        return chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(session.getId());
+        return new ChatMessagesResult(
+                chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(session.getId()),
+                session.isSessionEnded());
     }
 
     public List<ChatSession> getMySessions(Long userId) {
@@ -215,7 +221,8 @@ public class ChatService {
                 riskLevel(session),
                 riskDescription(session),
                 progress.progressPercent(),
-                ConsultationProgressResponse.from(progress));
+                ConsultationProgressResponse.from(progress),
+                session.isSessionEnded());
     }
 
     private List<Report> myReports(Long userId) {
