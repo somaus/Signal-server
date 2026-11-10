@@ -65,6 +65,9 @@ class ProtectionControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     private Protection protection() {
         Protection protection = Protection.builder().userId(1L).assessmentId(2L)
                 .protectionLevel(ProtectionLevel.NORMAL).originalImageUrl("/uploads/o.png").build();

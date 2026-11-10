@@ -2,16 +2,25 @@ package com.signal.domain.auth.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
+import com.signal.domain.auth.dto.request.LoginRequest;
 import com.signal.domain.auth.dto.request.ResetPasswordRequest;
 import com.signal.domain.auth.dto.response.TokenResponse;
+import com.signal.domain.auth.entity.RefreshToken;
+import com.signal.domain.auth.repository.RefreshTokenRepository;
 import com.signal.domain.user.entity.User;
 import com.signal.domain.user.repository.UserRepository;
+import com.signal.domain.user.service.AnonymousRecordClaimer;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.security.jwt.JwtProvider;
 import java.util.Base64;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,6 +45,15 @@ class AuthServiceTest {
     @Mock
     private VerificationService verificationService;
 
+    @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+
+    @Mock
+    private AnonymousRecordClaimer anonymousRecordClaimer;
+
+    /** 리프레시 토큰 저장소를 메모리로 흉내 내, 회전과 폐기가 실제 흐름대로 이어지는지 확인한다. */
+    private final Map<String, RefreshToken> stored = new LinkedHashMap<>();
+
     private JwtProvider jwtProvider;
     private AuthService authService;
     private User user;
@@ -49,11 +67,44 @@ class AuthServiceTest {
         ReflectionTestUtils.setField(jwtProvider, "refreshTokenExpiration", 1_209_600_000L);
         ReflectionTestUtils.invokeMethod(jwtProvider, "init");
 
-        authService = new AuthService(userRepository, passwordEncoder, jwtProvider, verificationService);
+        authService = new AuthService(userRepository, passwordEncoder, jwtProvider, verificationService,
+                refreshTokenRepository, anonymousRecordClaimer);
         ReflectionTestUtils.setField(authService, "accessTokenExpiration", 3_600_000L);
+        ReflectionTestUtils.setField(authService, "refreshReuseGraceSeconds", 15L);
 
         user = User.builder().email("user@example.com").password("encoded").name("사용자").build();
         ReflectionTestUtils.setField(user, "id", USER_ID);
+
+        lenient().when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
+        lenient().when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
+        lenient().when(passwordEncoder.matches("pw", "encoded")).thenReturn(true);
+        lenient().when(refreshTokenRepository.save(org.mockito.ArgumentMatchers.any(RefreshToken.class)))
+                .thenAnswer(i -> {
+                    RefreshToken t = i.getArgument(0);
+                    stored.put(t.getJti(), t);
+                    return t;
+                });
+        lenient().when(refreshTokenRepository.findById(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(i -> Optional.ofNullable(stored.get(i.<String>getArgument(0))));
+        lenient().when(refreshTokenRepository.markUsed(org.mockito.ArgumentMatchers.anyString(),
+                        org.mockito.ArgumentMatchers.any(java.time.LocalDateTime.class)))
+                .thenAnswer(i -> {
+                    RefreshToken t = stored.get(i.<String>getArgument(0));
+                    if (t == null || t.isUsed()) {
+                        return 0;
+                    }
+                    ReflectionTestUtils.setField(t, "used", true);
+                    ReflectionTestUtils.setField(t, "usedAt", i.<java.time.LocalDateTime>getArgument(1));
+                    return 1;
+                });
+        lenient().doAnswer(i -> stored.values().removeIf(t -> t.getSessionId().equals(i.getArgument(0))))
+                .when(refreshTokenRepository).deleteBySessionId(org.mockito.ArgumentMatchers.anyString());
+        lenient().doAnswer(i -> stored.values().removeIf(t -> t.getUserId().equals(i.getArgument(0))))
+                .when(refreshTokenRepository).deleteByUserId(org.mockito.ArgumentMatchers.anyLong());
+    }
+
+    private TokenResponse login() {
+        return authService.login(new LoginRequest("user@example.com", "pw"));
     }
 
     private void assertInvalidRefreshToken(String refreshToken) {
@@ -63,11 +114,26 @@ class AuthServiceTest {
     }
 
     @Test
-    void 유효한_리프레시_토큰이면_새_토큰을_발급한다() {
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        String refreshToken = jwtProvider.createRefreshToken(USER_ID, user.getTokenVersion());
+    void 로그인하면_익명_식별자의_비회원_기록을_이_계정으로_옮긴다() {
+        authService.login(new LoginRequest("user@example.com", "pw"), "anon-1");
 
-        TokenResponse response = authService.reissue(refreshToken);
+        verify(anonymousRecordClaimer).claim(USER_ID, "anon-1");
+    }
+
+    @Test
+    void 로그인에_실패하면_비회원_기록을_옮기지_않는다() {
+        when(passwordEncoder.matches("wrong", "encoded")).thenReturn(false);
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("user@example.com", "wrong"), "anon-1"))
+                .isInstanceOfSatisfying(SignalException.class,
+                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.LOGIN_FAILED));
+        verify(anonymousRecordClaimer, never()).claim(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    void 유효한_리프레시_토큰이면_새_토큰을_발급한다() {
+        TokenResponse response = authService.reissue(login().refreshToken());
 
         assertThat(jwtProvider.validateToken(response.accessToken())).isTrue();
         assertThat(jwtProvider.isRefreshToken(response.accessToken())).isFalse();
@@ -84,48 +150,97 @@ class AuthServiceTest {
 
     @Test
     void 액세스_토큰으로는_재발급할_수_없다() {
-        assertInvalidRefreshToken(jwtProvider.createAccessToken(USER_ID, user.getTokenVersion()));
+        assertInvalidRefreshToken(login().accessToken());
     }
 
     @Test
     void 사용자가_없으면_거부한다() {
         when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
 
-        assertInvalidRefreshToken(jwtProvider.createRefreshToken(USER_ID, 0));
+        assertInvalidRefreshToken(jwtProvider.createRefreshToken(USER_ID, 0, "sess", "jti"));
     }
 
     @Test
-    void 로그아웃하면_이전에_발급한_리프레시_토큰으로_재발급할_수_없다() {
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        String refreshToken = jwtProvider.createRefreshToken(USER_ID, user.getTokenVersion());
-
-        authService.logout(USER_ID);
-
-        assertThat(user.getTokenVersion()).isEqualTo(1);
-        assertInvalidRefreshToken(refreshToken);
-        // 로그아웃 이후 새로 발급한 토큰은 통한다.
-        assertThat(authService.reissue(jwtProvider.createRefreshToken(USER_ID, user.getTokenVersion()))).isNotNull();
+    void 저장되지_않은_리프레시_토큰은_거부한다() {
+        assertInvalidRefreshToken(jwtProvider.createRefreshToken(USER_ID, 0, "sess", "jti"));
     }
 
     @Test
-    void 없는_사용자의_로그아웃은_NOT_FOUND다() {
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.empty());
+    void 재발급하면_새_리프레시_토큰이_이어서_쓰이고_같은_세션에_묶인다() {
+        String first = login().refreshToken();
 
-        assertThatThrownBy(() -> authService.logout(USER_ID))
-                .isInstanceOfSatisfying(SignalException.class,
-                        e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.NOT_FOUND));
+        String second = authService.reissue(first).refreshToken();
+        String third = authService.reissue(second).refreshToken();
+
+        assertThat(jwtProvider.getSessionId(second)).isEqualTo(jwtProvider.getSessionId(first));
+        assertThat(jwtProvider.getSessionId(third)).isEqualTo(jwtProvider.getSessionId(first));
+        assertThat(jwtProvider.getJti(second)).isNotEqualTo(jwtProvider.getJti(first));
     }
 
     @Test
-    void 비밀번호를_재설정하면_이전_리프레시_토큰으로_재발급할_수_없다() {
-        when(userRepository.findByEmail("user@example.com")).thenReturn(Optional.of(user));
-        when(userRepository.findById(USER_ID)).thenReturn(Optional.of(user));
-        String oldRefreshToken = jwtProvider.createRefreshToken(USER_ID, user.getTokenVersion());
+    void 재발급에_쓴_리프레시_토큰으로_다시_재발급하면_거부한다() {
+        String first = login().refreshToken();
+        authService.reissue(first);
+
+        assertInvalidRefreshToken(first);
+    }
+
+    @Test
+    void 이미_쓴_토큰이_유예_시간_뒤에_다시_오면_그_세션의_토큰을_모두_폐기한다() {
+        ReflectionTestUtils.setField(authService, "refreshReuseGraceSeconds", 0L);
+        String first = login().refreshToken();
+        String second = authService.reissue(first).refreshToken();
+
+        assertInvalidRefreshToken(first);
+
+        assertInvalidRefreshToken(second);
+    }
+
+    @Test
+    void 방금_쓴_토큰이_유예_시간_안에_다시_오면_거절만_하고_세션은_유지한다() {
+        String first = login().refreshToken();
+        String second = authService.reissue(first).refreshToken();
+
+        assertInvalidRefreshToken(first);
+
+        // 먼저 간 요청이 받은 새 토큰은 계속 쓸 수 있다
+        assertThat(authService.reissue(second)).isNotNull();
+    }
+
+    @Test
+    void 쓰인_시각이_없는_기존_토큰이_다시_오면_유예_없이_재사용으로_본다() {
+        String first = login().refreshToken();
+        String second = authService.reissue(first).refreshToken();
+        // 기존 행(used_at 없음)을 흉내 낸다
+        ReflectionTestUtils.setField(stored.get(jwtProvider.getJti(first)), "usedAt", null);
+
+        assertInvalidRefreshToken(first);
+
+        assertInvalidRefreshToken(second);
+    }
+
+    @Test
+    void 한_기기에서_로그아웃해도_다른_기기의_재발급은_성공한다() {
+        TokenResponse deviceA = login();
+        TokenResponse deviceB = login();
+
+        authService.logout(jwtProvider.getSessionId(deviceA.accessToken()));
+
+        assertInvalidRefreshToken(deviceA.refreshToken());
+        assertThat(authService.reissue(deviceB.refreshToken())).isNotNull();
+    }
+
+    @Test
+    void 비밀번호를_재설정하면_모든_기기에서_재발급할_수_없다() {
+        TokenResponse deviceA = login();
+        TokenResponse deviceB = login();
 
         authService.resetPassword(new ResetPasswordRequest(
                 "user@example.com", "vrf_token", "newpassword1", "newpassword1"));
 
-        assertInvalidRefreshToken(oldRefreshToken);
+        assertInvalidRefreshToken(deviceA.refreshToken());
+        assertInvalidRefreshToken(deviceB.refreshToken());
+        assertThat(stored).isEmpty();
     }
 
     @Test

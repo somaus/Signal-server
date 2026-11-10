@@ -60,6 +60,9 @@ class DeepfakeDetectionControllerWebSearchTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     @Test
     void 웹_검색이_꺼져_있으면_404_WEB_SEARCH_DISABLED다() throws Exception {
         when(webSearchService.isEnabled()).thenReturn(false);

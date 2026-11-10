@@ -65,6 +65,9 @@ class MonitoringControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     private Monitoring monitoring() {
         Monitoring monitoring = Monitoring.builder().userId(1L).referenceImageUrl("/uploads/r.png").build();
         ReflectionTestUtils.setField(monitoring, "id", 4L);

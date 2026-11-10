@@ -39,6 +39,7 @@ public enum ErrorCode {
     ANONYMOUS_DETECTION_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "비로그인 체험 가능 횟수를 초과했습니다. 로그인 후 이용해주세요."),
     ANONYMOUS_RISK_ASSESSMENT_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "비로그인 체험 가능 횟수를 초과했습니다. 로그인 후 이용해주세요."),
     ANONYMOUS_CHAT_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "비로그인 체험 가능 횟수를 초과했습니다. 로그인 후 이용해주세요."),
+    ANONYMOUS_IP_RATE_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "요청이 너무 많습니다. 잠시 후 다시 시도하거나 로그인 후 이용해주세요."),
 
     // 이미지 보호
     PROTECTION_NOT_READY(HttpStatus.CONFLICT, "이미지 보호 처리가 아직 완료되지 않았습니다."),
@@ -48,6 +49,9 @@ public enum ErrorCode {
 
     // 얼굴 도용 모니터링
     MONITORING_LIMIT_EXCEEDED(HttpStatus.TOO_MANY_REQUESTS, "등록할 수 있는 모니터링 수를 초과했습니다. 기존 모니터링을 삭제한 뒤 다시 시도해주세요."),
+
+    // 상담
+    CHAT_SESSION_ENDED(HttpStatus.CONFLICT, "이미 종료된 상담입니다. 새 상담을 시작해주세요."),
 
     // 신고 문서
     REQUIRED_FIELD_MISSING(HttpStatus.BAD_REQUEST, "필수 항목이 누락되었습니다."),

@@ -1,6 +1,7 @@
 package com.signal.global.security.jwt;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -59,11 +60,13 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
         when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
         when(jwtProvider.getTokenVersion(TOKEN)).thenReturn(0);
-        when(userRepository.findTokenVersionById(1L)).thenReturn(Optional.of(0));
+        when(jwtProvider.getSessionId(TOKEN)).thenReturn("sess-1");
+        when(userRepository.findTokenVersionByIdWithLiveSession(1L, "sess-1")).thenReturn(Optional.of(0));
 
         Authentication authentication = doFilterWithBearer(TOKEN);
 
         assertThat(authentication).isNotNull();
+        assertThat(authentication.getDetails()).isEqualTo("sess-1");
         assertThat(authentication.getPrincipal()).isEqualTo(1L);
     }
 
@@ -73,7 +76,19 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
         when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
         when(jwtProvider.getTokenVersion(TOKEN)).thenReturn(0);
-        when(userRepository.findTokenVersionById(1L)).thenReturn(Optional.of(1));
+        when(jwtProvider.getSessionId(TOKEN)).thenReturn("sess-1");
+        when(userRepository.findTokenVersionByIdWithLiveSession(1L, "sess-1")).thenReturn(Optional.of(1));
+
+        assertThat(doFilterWithBearer(TOKEN)).isNull();
+    }
+
+    @Test
+    void 로그아웃으로_세션이_폐기된_뒤의_액세스_토큰으로는_인증하지_않는다() throws Exception {
+        when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
+        when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
+        when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
+        when(jwtProvider.getSessionId(TOKEN)).thenReturn("sess-1");
+        when(userRepository.findTokenVersionByIdWithLiveSession(1L, "sess-1")).thenReturn(Optional.empty());
 
         assertThat(doFilterWithBearer(TOKEN)).isNull();
     }
@@ -83,9 +98,21 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
         when(jwtProvider.getUserId(TOKEN)).thenReturn(99L);
-        when(userRepository.findTokenVersionById(99L)).thenReturn(Optional.empty());
+        when(jwtProvider.getSessionId(TOKEN)).thenReturn("sess-1");
+        when(userRepository.findTokenVersionByIdWithLiveSession(99L, "sess-1")).thenReturn(Optional.empty());
 
         assertThat(doFilterWithBearer(TOKEN)).isNull();
+    }
+
+    @Test
+    void 세션_식별자가_없는_액세스_토큰으로는_조회_없이_인증하지_않는다() throws Exception {
+        when(jwtProvider.validateToken(TOKEN)).thenReturn(true);
+        when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(false);
+        when(jwtProvider.getUserId(TOKEN)).thenReturn(1L);
+        when(jwtProvider.getSessionId(TOKEN)).thenReturn(null);
+
+        assertThat(doFilterWithBearer(TOKEN)).isNull();
+        verify(userRepository, never()).findTokenVersionByIdWithLiveSession(anyLong(), any());
     }
 
     @Test
@@ -94,7 +121,7 @@ class JwtAuthenticationFilterTest {
         when(jwtProvider.isRefreshToken(TOKEN)).thenReturn(true);
 
         assertThat(doFilterWithBearer(TOKEN)).isNull();
-        verify(userRepository, never()).findTokenVersionById(anyLong());
+        verify(userRepository, never()).findTokenVersionByIdWithLiveSession(anyLong(), any());
     }
 
     @Test

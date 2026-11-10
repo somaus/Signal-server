@@ -19,6 +19,7 @@ import com.signal.domain.chat.engine.SituationType;
 import com.signal.domain.chat.entity.ChatMessage;
 import com.signal.domain.chat.entity.ChatSession;
 import com.signal.domain.chat.progress.ConsultationProgress;
+import com.signal.domain.chat.service.ChatMessagesResult;
 import com.signal.domain.chat.service.ChatService;
 import com.signal.domain.chat.service.SendMessageResult;
 import com.signal.domain.user.repository.UserRepository;
@@ -69,6 +70,9 @@ class ChatControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     private ChatSession session(boolean saveConsent) {
         return ChatSession.builder().sessionId("s-1").userId(1L).saveConsent(saveConsent).build();
     }
@@ -109,7 +113,20 @@ class ChatControllerTest {
 
         mockMvc.perform(get("/api/v1/chat/sessions").with(USER_1))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].sessionId").value("s-1"));
+                .andExpect(jsonPath("$[0].sessionId").value("s-1"))
+                .andExpect(jsonPath("$[0].sessionEnded").value(false));
+    }
+
+    @Test
+    void 종료된_세션은_세션_조회에_sessionEnded_true를_담는다() throws Exception {
+        ChatSession ended = session(true);
+        ended.markAwaitingEndConfirmation();
+        ended.resolveEndConfirmation(true);
+        when(chatService.getSession("s-1", 1L, null)).thenReturn(ended);
+
+        mockMvc.perform(get("/api/v1/chat/sessions/s-1").with(USER_1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sessionEnded").value(true));
     }
 
     @Test
@@ -182,11 +199,23 @@ class ChatControllerTest {
 
     @Test
     void 메시지_목록을_반환한다() throws Exception {
-        when(chatService.getMessages("s-1", 1L, null))
-                .thenReturn(List.of(ChatMessage.builder().chatSessionId(1L).content("안녕").build()));
+        when(chatService.getMessages("s-1", 1L, null)).thenReturn(new ChatMessagesResult(
+                List.of(ChatMessage.builder().chatSessionId(1L).content("안녕").build()), true));
 
         mockMvc.perform(get("/api/v1/chat/sessions/s-1/messages").with(USER_1))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.messages[0].content").value("안녕"));
+                .andExpect(jsonPath("$.messages[0].content").value("안녕"))
+                .andExpect(jsonPath("$.sessionEnded").value(true));
+    }
+
+    @Test
+    void 종료된_상담에_메시지를_보내면_409_CHAT_SESSION_ENDED다() throws Exception {
+        when(chatService.sendMessage(anyString(), any(), any(), anyString()))
+                .thenThrow(new SignalException(ErrorCode.CHAT_SESSION_ENDED));
+
+        mockMvc.perform(post("/api/v1/chat/sessions/s-1/messages").with(USER_1)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"content\":\"hi\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CHAT_SESSION_ENDED"));
     }
 }

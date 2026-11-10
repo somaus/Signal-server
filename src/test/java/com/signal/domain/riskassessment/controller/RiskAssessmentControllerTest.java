@@ -61,6 +61,9 @@ class RiskAssessmentControllerTest {
     @MockitoBean
     private UserRepository userRepository;
 
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
+
     private RiskAssessment processing() {
         RiskAssessment assessment = RiskAssessment.processing(null, "anon-1", "/uploads/a.png");
         ReflectionTestUtils.setField(assessment, "id", 6L);

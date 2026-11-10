@@ -7,8 +7,8 @@ import com.signal.domain.chat.dto.response.ChatSessionCreateResponse;
 import com.signal.domain.chat.dto.response.ChatSessionResponse;
 import com.signal.domain.chat.dto.response.ChatSummaryResponse;
 import com.signal.domain.chat.dto.response.SendMessageResponse;
-import com.signal.domain.chat.entity.ChatMessage;
 import com.signal.domain.chat.entity.ChatSession;
+import com.signal.domain.chat.service.ChatMessagesResult;
 import com.signal.domain.chat.service.ChatService;
 import com.signal.domain.chat.service.SendMessageResult;
 import jakarta.validation.Valid;
@@ -93,7 +93,7 @@ public class ChatController {
             @AuthenticationPrincipal Long userId,
             @RequestHeader(value = "X-Anonymous-Id", required = false) String anonymousId,
             @PathVariable String sessionId) {
-        List<ChatMessage> messages = chatService.getMessages(sessionId, userId, anonymousId);
-        return ResponseEntity.ok(ChatMessagesResponse.from(messages));
+        ChatMessagesResult result = chatService.getMessages(sessionId, userId, anonymousId);
+        return ResponseEntity.ok(ChatMessagesResponse.from(result.messages(), result.sessionEnded()));
     }
 }

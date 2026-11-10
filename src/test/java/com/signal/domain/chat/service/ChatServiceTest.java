@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -158,9 +159,64 @@ class ChatServiceTest {
         when(chatMessageRepository.findByChatSessionIdOrderByCreatedAtAsc(session.getId()))
                 .thenReturn(List.of(message));
 
-        List<ChatMessage> messages = chatService.getMessages("session-1", 1L, null);
+        ChatMessagesResult result = chatService.getMessages("session-1", 1L, null);
 
-        assertThat(messages).containsExactly(message);
+        assertThat(result.messages()).containsExactly(message);
+        assertThat(result.sessionEnded()).isFalse();
+    }
+
+    @Test
+    void 종료된_세션의_메시지목록과_요약은_sessionEnded가_true다() {
+        ChatSession session = endedSession();
+        when(chatSessionRepository.findBySessionId("session-1")).thenReturn(Optional.of(session));
+        when(reportRepository.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of());
+
+        assertThat(chatService.getMessages("session-1", 1L, null).sessionEnded()).isTrue();
+        assertThat(chatService.getSummary("session-1", 1L, null).sessionEnded()).isTrue();
+    }
+
+    @Test
+    void 종료된_세션에_메시지를_보내면_답변을_만들지_않고_CHAT_SESSION_ENDED로_거절한다() {
+        ChatSession session = endedSession();
+        when(chatSessionRepository.findBySessionId("session-1")).thenReturn(Optional.of(session));
+
+        assertThatThrownBy(() -> chatService.sendMessage("session-1", 1L, null, "또 말할게요"))
+                .isInstanceOf(SignalException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.CHAT_SESSION_ENDED);
+
+        verifyNoInteractions(chatEngine);
+        verify(chatMessageRepository, never()).save(any());
+    }
+
+    @Test
+    void 종료된_세션이라도_위기_메시지는_거절하지_않고_엔진_응답을_내보낸다() {
+        ChatSession session = endedSession();
+        when(chatSessionRepository.findBySessionId("session-1")).thenReturn(Optional.of(session));
+        when(chatEngine.respond(eq("죽고 싶어요"), any())).thenReturn(new ChatEngineResponse(
+                "위기 응답", SituationType.GENERAL, List.of(), true, List.of()));
+        when(chatMessageRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+
+        SendMessageResult result = chatService.sendMessage("session-1", 1L, null, "죽고 싶어요");
+
+        assertThat(result.engineResponse().crisisDetected()).isTrue();
+        assertThat(result.sessionEnded()).isTrue();
+    }
+
+    @Test
+    void 종료된_세션이라도_남의_세션이면_종료_여부를_알리지_않고_FORBIDDEN이다() {
+        ChatSession session = endedSession();
+        when(chatSessionRepository.findBySessionId("session-1")).thenReturn(Optional.of(session));
+
+        assertThatThrownBy(() -> chatService.sendMessage("session-1", 2L, null, "hi"))
+                .isInstanceOf(SignalException.class)
+                .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+    }
+
+    private ChatSession endedSession() {
+        ChatSession session = ChatSession.builder().sessionId("session-1").userId(1L).build();
+        session.markAwaitingEndConfirmation();
+        session.resolveEndConfirmation(true);
+        return session;
     }
 
     @Test
