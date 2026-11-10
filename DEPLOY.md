@@ -25,6 +25,17 @@ Actions → CD → **Run workflow**에서 `run_schema_update`를 체크하고 �
 CD는 `.env`를 건드리지 않으며, `git reset --hard`는 gitignore된 `.env`를 지우지 않는다.
 단 **추적되는 파일을 서버에서 직접 수정하면 배포 때 덮어써진다.**
 
+### 비로그인 IP 제한
+
+비로그인 탐지·위험도 분석·상담·웹 검색은 IP당 1시간 30회, 인증 메일 발송(`POST /api/v1/auth/verification/send`)은 IP당 1시간 10회로 막는다
+(`anonymous.ip-rate-limit.max-requests`, `anonymous.ip-rate-limit.verification-max-requests`, `anonymous.ip-rate-limit.window`).
+IP는 `getRemoteAddr()`만 쓴다. 인스턴스 메모리라 재시작하면 초기화된다.
+
+- **머지·배포 전에 운영 서버에서 `getRemoteAddr()`가 클라이언트마다 다른 값인지 확인한다.** 앞단 프록시나 Docker 네트워크 때문에 같은 값(게이트웨이·브리지 IP)이면
+  모든 비로그인 사용자가 한 칸을 같이 써서 서비스 전체가 1시간에 30회만 쓸 수 있다.
+- 프록시 뒤라면 `server.forward-headers-strategy`를 켜야 실제 클라이언트 IP가 된다. 단 신뢰하는 프록시가 `X-Forwarded-For`를 덮어쓸 때만 켠다(아니면 클라이언트가 위조해 제한을 피한다).
+- **학교·행사장처럼 한 공인 IP를 여럿이 쓰는 시연 전에 `max-requests`(필요하면 `verification-max-requests`)를 올려 둔다.** 같은 Wi-Fi의 기기들이 한 IP로 보인다.
+
 ### 전용 딥페이크 탐지 서비스 (detect)
 
 탐지 방식은 `deepfake-detection.mode`로 정한다. `llm`은 기존 비전 LLM 탐지, `http`는 별도 서비스(`detect-lab`, CommunityForensics ViT-S)의 점수로 등급을 정한다. 자세한 내용은 [docs/deepfake-detection.md](docs/deepfake-detection.md).
