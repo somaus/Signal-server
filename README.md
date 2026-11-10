@@ -37,7 +37,7 @@ Signal은 사용자가 SNS에 사진을 올리기 전 위험 요소를 진단하
 | 기능 | 구현체 | 상태 |
 | --- | --- | --- |
 | 챗봇 | `LlmChatEngine` | Groq LLM 연동 (일반 대화 답변만 LLM 생성, 위기 감지·추천 행동/기관·단계별 안내 블록·진행 단계 완료 판정은 서버 규칙, 같은 세션 최근 대화 최대 10개를 맥락으로 함께 전달). 설계와 기관 번호 근거는 [docs/chat-guidance.md](docs/chat-guidance.md) |
-| 위험도 분석 | `LlmRiskAnalyzer` | Groq 비전 LLM 연동 (이미지 품질·얼굴 노출도·역검색 위험 추정은 LLM, 메타데이터 노출은 EXIF 직접 판독) |
+| 위험도 분석 | `LlmRiskAnalyzer` | Groq 비전 LLM 연동 (이미지 품질·얼굴 노출도·노출 가능성(역검색 위험 추정, 응답에 추정치 안내가 붙음)은 LLM, 메타데이터 노출은 EXIF 직접 판독) |
 | 딥페이크 탐지 | `LlmDeepfakeDetector`(기본) / `HttpDeepfakeDetector` | 기본은 Groq 비전 LLM 연동(이미지만 지원). `deepfake-detection.mode=http`이면 `detect-lab` 서비스의 전용 탐지 모델(CommunityForensics ViT-S)을 호출한다. 둘 다 영상은 미지원 |
 | 이미지 보호 처리 | `NoiseImageProtector` | 서버에서 직접 픽셀 노이즈 삽입(2x2 블록 상관 노이즈, 수준별 진폭 3/6/12, PNG 저장, 실측 visualDifference). 학습 모델을 겨냥한 적대적 섭동은 아니므로 도용·합성 방지를 보장하지 않음 |
 | 얼굴 모니터링 | `StubFaceMonitor` | 미구현 (Stub) — 역이미지 검색은 LLM으로 불가능, 전문 서비스(예: PimEyes류) API 연동 필요 |
