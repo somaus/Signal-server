@@ -85,4 +85,28 @@ class FileUrlSignerTest {
         assertThat(signer.requiresSignature("/uploads/profile/sub/a.png")).isTrue();
         assertThat(signer.requiresSignature("/uploads/profile/a.png")).isFalse();
     }
+
+    @Test
+    void 프로필_공개_경로는_서명하지_않고_그_밖의_uploads_경로는_서명한다() {
+        FileUrlSigner signer = signerAt(NOW);
+
+        assertThat(signer.requiresSignature("/uploads/profile/a.png")).isFalse();
+        assertThat(signer.requiresSignature("/uploads/protections/a.png")).isTrue();
+        assertThat(signer.requiresSignature("/api/v1/users/me")).isFalse();
+        assertThat(signer.sign("/uploads/profile/a.png")).isEqualTo("/uploads/profile/a.png");
+    }
+
+    @Test
+    void 프로필_경로라도_상위_경로_표기가_있으면_서명이_필요하다() {
+        assertThat(signerAt(NOW).requiresSignature("/uploads/profile/a..png")).isTrue();
+    }
+
+    @Test
+    void 만료시각이나_서명이_없으면_거절한다() {
+        String signed = signerAt(NOW).sign("/uploads/protections/a.png");
+
+        assertThat(signerAt(NOW).verify("/uploads/protections/a.png", null, param(signed, "sig"))).isFalse();
+        assertThat(signerAt(NOW).verify("/uploads/protections/a.png", param(signed, "exp"), null)).isFalse();
+        assertThat(signerAt(NOW).verify("/uploads/protections/a.png", "not-a-number", param(signed, "sig"))).isFalse();
+    }
 }
