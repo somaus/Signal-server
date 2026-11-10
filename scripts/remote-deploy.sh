@@ -11,6 +11,7 @@
 #   RUN_SCHEMA_UPDATE=true  엔티티에 컬럼/테이블이 추가된 배포에서 ddl-auto=update로 스키마를 먼저 반영
 #   DEEPFAKE_DETECTION_MODE  http면 전용 탐지 서비스(detect)를 띄우고 앱이 그걸 쓰게 한다. llm이면 detect를 내린다.
 #                            비어 있으면 건드리지 않는다(서버 .env와 compose 기본값을 따른다).
+#   FILE_URL_SIGNING_SECRET  업로드 파일 서명 URL용 키. 서버 .env에 이 키가 없을 때만 .env에 추가한다(있으면 서버 값을 유지).
 #   DETECT_IMAGE            detect 이미지(예: ghcr.io/somaus/signal-detect:<sha>). http일 때 필요하다.
 #
 set -euo pipefail
@@ -55,6 +56,12 @@ if cid="$(docker compose ps -q app 2>/dev/null)" && [ -n "$cid" ]; then
 fi
 log "현재 이미지: ${PREV_IMAGE:-(없음)}"
 log "배포할 이미지: $APP_IMAGE"
+
+# 운영 프로필은 FILE_URL_SIGNING_SECRET이 없으면 기동하지 못한다. 서버 .env에 없을 때만 넘겨받은 값을 추가한다.
+if [ -n "${FILE_URL_SIGNING_SECRET:-}" ] && ! grep -qE '^FILE_URL_SIGNING_SECRET=' .env 2>/dev/null; then
+    log ".env에 FILE_URL_SIGNING_SECRET 추가"
+    printf '\nFILE_URL_SIGNING_SECRET=%s\n' "$FILE_URL_SIGNING_SECRET" >> .env
+fi
 
 log "GHCR 로그인"
 printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
