@@ -13,6 +13,7 @@ import com.signal.domain.riskassessment.service.RiskAssessmentService;
 import com.signal.domain.user.repository.UserRepository;
 import com.signal.global.config.SecurityConfig;
 import com.signal.global.exception.GlobalExceptionHandler;
+import com.signal.global.file.FileUrlSigner;
 import com.signal.global.security.JwtAccessDeniedHandler;
 import com.signal.global.security.JwtAuthenticationEntryPoint;
 import com.signal.global.security.jwt.JwtAuthenticationFilter;
@@ -51,6 +52,9 @@ class AnonymousIpRateLimitConfigTest {
 
     @MockitoBean
     private UserRepository userRepository;
+
+    @MockitoBean
+    private FileUrlSigner fileUrlSigner;
 
     private void post(String anonymousId, RequestPostProcessor user, int expected) throws Exception {
         var request = multipart("/api/v1/risk-assessments")

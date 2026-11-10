@@ -25,6 +25,9 @@ Actions → CD → **Run workflow**에서 `run_schema_update`를 체크하고 �
 CD는 `.env`를 건드리지 않으며, `git reset --hard`는 gitignore된 `.env`를 지우지 않는다.
 단 **추적되는 파일을 서버에서 직접 수정하면 배포 때 덮어써진다.**
 
+`.env`에 반드시 있어야 하는 값 중 기본값이 없어 빠지면 앱이 기동하지 못하는 것:
+- `FILE_URL_SIGNING_SECRET`: 민감한 업로드 파일의 서명 URL 키. 충분히 긴 무작위 값(`openssl rand -base64 48`)으로, `JWT_SECRET`과 다른 값을 쓴다. **이 값을 서버 `.env`에 먼저 넣은 뒤 서명 URL 변경(#86)을 배포한다.** 빠지면 새 컨테이너가 기동에 실패해 배포가 실패한다.
+
 ### 비로그인 IP 제한
 
 비로그인 탐지·위험도 분석·상담·웹 검색은 IP당 1시간 30회, 인증 메일 발송(`POST /api/v1/auth/verification/send`)은 IP당 1시간 10회로 막는다

@@ -43,6 +43,9 @@ import org.springframework.test.web.servlet.ResultActions;
 @TestPropertySource(properties = "cors.allowed-origins=http://localhost:3000")
 class AuthControllerTest {
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.signal.global.file.FileUrlSigner fileUrlSigner;
+
     private static final String SIGNUP_BODY = """
             {"email":"a@b.com","password":"password1","verificationToken":"vt","name":"홍길동",
              "age":30,"gender":"MALE","agreements":{"termsOfService":true,"privacyPolicy":true}}""";

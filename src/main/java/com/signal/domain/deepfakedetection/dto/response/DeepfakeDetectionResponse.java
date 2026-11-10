@@ -6,6 +6,7 @@ import com.signal.domain.deepfakedetection.entity.DeepfakeDetectionStatus;
 import com.signal.domain.deepfakedetection.entity.DetectionFailureReason;
 import com.signal.domain.deepfakedetection.entity.ProvenanceSignal;
 import com.signal.domain.deepfakedetection.entity.Verdict;
+import com.signal.global.file.FileUrlSigner;
 import java.util.List;
 
 /**
@@ -39,7 +40,7 @@ public record DeepfakeDetectionResponse(
 
     /** webSearch가 null이면 웹 검색 기능이 꺼져 있거나 이 탐지에는 검색이 없다(화면은 "준비 중"으로 둔다). */
     public static DeepfakeDetectionResponse from(DeepfakeDetection detection, WebSearch webSearch,
-                                                 boolean webSearchAvailable) {
+                                                 boolean webSearchAvailable, FileUrlSigner signer) {
         List<String> codes = detection.getProvenanceSignals() == null ? List.of() : detection.getProvenanceSignals();
         return new DeepfakeDetectionResponse(
                 detection.getId(),
@@ -48,7 +49,7 @@ public record DeepfakeDetectionResponse(
                 detection.getConfidence(),
                 detection.getRiskScore(),
                 detection.getEvidences().stream().map(EvidenceResponse::from).toList(),
-                detection.getHighlightedResultUrl(),
+                signer.sign(detection.getHighlightedResultUrl()),
                 detection.getFallbackUsed(),
                 detection.getFailureReason(),
                 detection.getBand(),
