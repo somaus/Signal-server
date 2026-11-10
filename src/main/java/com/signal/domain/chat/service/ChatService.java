@@ -10,6 +10,7 @@ import com.signal.domain.chat.engine.SituationType;
 import com.signal.domain.chat.guidance.AgencyCatalog;
 import com.signal.domain.chat.guidance.GuidancePlanner;
 import com.signal.domain.chat.guidance.GuidanceText;
+import com.signal.domain.chat.guidance.SafetySignals;
 import com.signal.domain.chat.entity.ChatMessage;
 import com.signal.domain.chat.entity.ChatRole;
 import com.signal.domain.chat.entity.ChatSession;
@@ -73,8 +74,8 @@ public class ChatService {
     @Transactional
     public SendMessageResult sendMessage(String sessionId, Long userId, String anonymousId, String content) {
         ChatSession session = getOwnedSession(sessionId, userId, anonymousId);
-        // 종료된 상담에는 답변을 만들지 않는다. LLM 호출과 메시지 저장 전에 거절하고, 트랜잭션도 롤백된다.
-        if (session.isSessionEnded()) {
+        // 종료된 상담에는 답변을 만들지 않는다. 단 위기 신호는 버리지 않고 평소처럼 위기 응답과 기관 안내를 내보낸다.
+        if (session.isSessionEnded() && !SafetySignals.isCrisis(content)) {
             throw new SignalException(ErrorCode.CHAT_SESSION_ENDED);
         }
         List<ChatTurn> history = buildHistory(session.getId());
