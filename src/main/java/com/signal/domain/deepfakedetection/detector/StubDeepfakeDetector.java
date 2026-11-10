@@ -56,7 +56,7 @@ public class StubDeepfakeDetector implements DeepfakeDetector {
             Verdict verdict = toVerdict(riskScore);
             double confidence = Math.round((0.5 + (seed % 50) / 100.0) * 100) / 100.0;
             List<Evidence> evidences = buildEvidences(seed, isVideo);
-            String highlightedResultUrl = fileStorage.store(content, "highlighted.png", HIGHLIGHTED_RESULT_DIRECTORY);
+            String highlightedResultUrl = fileStorage.store(content, HIGHLIGHTED_RESULT_DIRECTORY);
 
             // 이 클래스는 항상 룰 기반(해시 기반) 폴백 경로이므로 fallbackUsed는 항상 true.
             markCompleted(detectionId, verdict, confidence, riskScore, evidences, highlightedResultUrl, true);

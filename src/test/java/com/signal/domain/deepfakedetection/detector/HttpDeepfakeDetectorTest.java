@@ -71,7 +71,7 @@ class HttpDeepfakeDetectorTest {
 
     private void stubFileLoadAndStore() {
         when(fileStorage.load(FILE_URL)).thenReturn(new byte[]{1, 2, 3});
-        when(fileStorage.store(any(byte[].class), eq("highlighted.png"), eq("deepfake-detections")))
+        when(fileStorage.store(any(byte[].class), eq("deepfake-detections")))
                 .thenReturn("/uploads/deepfake-detections/highlighted.png");
     }
 
@@ -263,7 +263,7 @@ class HttpDeepfakeDetectorTest {
         byte[] marked = ("0123456789abcdef http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia")
                 .getBytes(StandardCharsets.ISO_8859_1);
         when(fileStorage.load(FILE_URL)).thenReturn(marked);
-        when(fileStorage.store(any(byte[].class), eq("highlighted.png"), eq("deepfake-detections")))
+        when(fileStorage.store(any(byte[].class), eq("deepfake-detections")))
                 .thenReturn("/uploads/deepfake-detections/highlighted.png");
         server.expect(requestTo(DETECT_URL)).andRespond(withSuccess(scoreBody("0.05"), MediaType.APPLICATION_JSON));
 
@@ -283,7 +283,7 @@ class HttpDeepfakeDetectorTest {
         byte[] edited = ("0123456789abcdef http://cv.iptc.org/newscodes/digitalsourcetype/compositeWithTrainedAlgorithmicMedia")
                 .getBytes(StandardCharsets.ISO_8859_1);
         when(fileStorage.load(FILE_URL)).thenReturn(edited);
-        when(fileStorage.store(any(byte[].class), eq("highlighted.png"), eq("deepfake-detections")))
+        when(fileStorage.store(any(byte[].class), eq("deepfake-detections")))
                 .thenReturn("/uploads/deepfake-detections/highlighted.png");
         server.expect(requestTo(DETECT_URL)).andRespond(withSuccess(scoreBody("0.05"), MediaType.APPLICATION_JSON));
 

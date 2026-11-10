@@ -138,7 +138,7 @@ public class LlmDeepfakeDetector implements DeepfakeDetector {
             double confidence = clampConfidence(parsed.confidence());
             int riskScore = clampScore(parsed.riskScore());
             List<Evidence> evidences = toEvidences(parsed.evidences(), pixelSize);
-            String highlightedResultUrl = fileStorage.store(content, "highlighted.png", HIGHLIGHTED_RESULT_DIRECTORY);
+            String highlightedResultUrl = fileStorage.store(content, HIGHLIGHTED_RESULT_DIRECTORY);
 
             // 실제 비전 LLM 응답을 그대로 반영하는 경로이므로 fallbackUsed는 false.
             fallbackDetector.markCompleted(

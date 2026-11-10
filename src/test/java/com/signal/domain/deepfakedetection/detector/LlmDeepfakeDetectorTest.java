@@ -69,7 +69,7 @@ class LlmDeepfakeDetectorTest {
         DeepfakeDetection detection = sampleDetection();
         when(deepfakeDetectionRepository.findById(1L)).thenReturn(Optional.of(detection));
         when(fileStorage.load(anyString())).thenReturn(samplePngBytes());
-        when(fileStorage.store(any(byte[].class), anyString(), anyString()))
+        when(fileStorage.store(any(byte[].class), anyString()))
                 .thenReturn("/uploads/deepfake-detections/highlighted.png");
         when(visionCompletionClient.complete(any(byte[].class), anyString(), anyString(), anyString()))
                 .thenReturn("""

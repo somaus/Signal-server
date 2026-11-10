@@ -77,7 +77,7 @@ public class HttpImageProtector implements ImageProtector {
             }
 
             double visualDifference = toVisualDifference(response.getHeaders().getFirst(PSNR_HEADER));
-            String protectedImageUrl = fileStorage.store(protectedBytes, "protected.png", PROTECTED_IMAGE_DIRECTORY);
+            String protectedImageUrl = fileStorage.store(protectedBytes, PROTECTED_IMAGE_DIRECTORY);
 
             markCompleted(protectionId, protectedImageUrl, visualDifference);
         } catch (Exception e) {
