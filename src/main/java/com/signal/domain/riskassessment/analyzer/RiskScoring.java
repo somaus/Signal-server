@@ -55,6 +55,18 @@ final class RiskScoring {
         return (int) Math.round(Math.max(0, Math.min(100, weighted)));
     }
 
+    /**
+     * 실제 웹 역검색 결과를 반영한 종합 점수 = 이미지 품질 30% + 얼굴 노출도 30% + 메타데이터 노출 15% + 웹 역검색 25%.
+     * 가중치는 기존 40/40/20에서 역검색에 25%를 내주도록 임의로 나눈 값이며 검증된 값이 아니다.
+     */
+    static int overallWithReverseSearch(int imageQuality, int faceExposure, int metadataLeak, int reverseSearch) {
+        double weighted = 0.30 * imageQuality
+                + 0.30 * faceExposure
+                + 0.15 * metadataLeak
+                + 0.25 * reverseSearch;
+        return (int) Math.round(Math.max(0, Math.min(100, weighted)));
+    }
+
     /** value가 low 이하면 0, high 이상이면 1, 그 사이는 로그 눈금으로 보간한다. 값이 없거나 0 이하면 0. */
     static double logScale(Number value, double low, double high) {
         if (value == null || value.doubleValue() <= 0 || Double.isNaN(value.doubleValue())) {
