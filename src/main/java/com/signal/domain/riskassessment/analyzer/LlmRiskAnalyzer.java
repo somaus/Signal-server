@@ -30,8 +30,9 @@ import org.springframework.web.multipart.MultipartFile;
  * {@link HttpRiskAnalyzer}가 등록된다. 기존 StubRiskAnalyzer를 대체한다.
  *
  * 안전/정확성을 위한 역할 분담:
- * - 이미지 품질·얼굴 노출도·역검색 노출 위험처럼 실제로 "봐야" 판단할 수 있는 항목은 비전 LLM이 평가한다.
- *   단, 역검색 노출 위험은 실제 역이미지 검색을 수행한 결과가 아니라 이미지 특성에 기반한 LLM의 추정치일 뿐이다.
+ * - 이미지 품질·얼굴 노출도·노출 가능성(추정, type=REVERSE_SEARCH_RISK)처럼 실제로 "봐야" 판단할 수 있는 항목은 비전 LLM이 평가한다.
+ *   단, 노출 가능성은 실제 역이미지 검색을 수행한 결과가 아니라 이미지 특성에 기반한 LLM의 추정치일 뿐이다.
+ *   추정치임을 알리는 문구는 저장하지 않고 응답을 만들 때 붙인다({@code RiskFactorResponse}).
  * - 메타데이터 노출(GPS 등)은 LLM에게 묻지 않고, EXIF를 직접 파싱해 결정론적으로 판정한다
  *   (LLM은 픽셀만 볼 뿐 원본 파일의 EXIF 바이트를 볼 수 없어 이 항목을 신뢰성 있게 답할 수 없다).
  * - 위험도별 권고 문구는 계속 {@link StubRiskAnalyzer}의 검증된 고정 문구를 재사용한다(LLM이 임의로
@@ -158,7 +159,7 @@ public class LlmRiskAnalyzer implements RiskAnalyzer {
                         .build(),
                 RiskFactor.builder()
                         .type("REVERSE_SEARCH_RISK")
-                        .label(RiskTexts.label(RiskTexts.REVERSE_SEARCH_RISK, language, "역검색 노출 위험"))
+                        .label(RiskTexts.label(RiskTexts.REVERSE_SEARCH_RISK, language, "노출 가능성(추정)"))
                         .score(clampScore(parsed.reverseSearchRiskScore()))
                         .description(withScore(parsed.reverseSearchRiskNote(), clampScore(parsed.reverseSearchRiskScore()), language))
                         .build());
