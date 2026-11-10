@@ -42,6 +42,16 @@ public class RiskAssessmentService {
      */
     @Transactional
     public RiskAssessment createAssessment(Long userId, String anonymousId, MultipartFile image) {
+        return createAssessment(userId, anonymousId, image, false);
+    }
+
+    /**
+     * @param webSearchConsent true면 사용자가 웹 역검색(사진이 외부 검색 서비스로 전송됨)에 동의한 것이다. 동의한 분석만
+     *                         분석이 끝난 뒤 실제 검색 결과를 점수에 반영한다.
+     */
+    @Transactional
+    public RiskAssessment createAssessment(Long userId, String anonymousId, MultipartFile image,
+                                           boolean webSearchConsent) {
         UploadFileValidator.validate(image, MAX_IMAGE_SIZE, ALLOWED_CONTENT_TYPES);
         if (userId == null) {
             validateAnonymousUsage(anonymousId);
@@ -51,7 +61,7 @@ public class RiskAssessmentService {
         String imageUrl = fileStorage.store(image, IMAGE_DIRECTORY);
 
         RiskAssessment saved = riskAssessmentRepository.save(
-                RiskAssessment.processing(userId, userId == null ? anonymousId : null, imageUrl));
+                RiskAssessment.processing(userId, userId == null ? anonymousId : null, imageUrl, webSearchConsent));
 
         String filename = image.getOriginalFilename();
         String contentType = image.getContentType();

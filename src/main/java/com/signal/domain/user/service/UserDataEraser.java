@@ -2,6 +2,7 @@ package com.signal.domain.user.service;
 
 import com.signal.domain.agency.entity.AgencyConnection;
 import com.signal.domain.agency.repository.AgencyConnectionRepository;
+import com.signal.domain.auth.repository.RefreshTokenRepository;
 import com.signal.domain.chat.entity.ChatSession;
 import com.signal.domain.chat.repository.ChatMessageRepository;
 import com.signal.domain.chat.repository.ChatSessionRepository;
@@ -53,6 +54,7 @@ public class UserDataEraser {
     private final AgencyConnectionRepository agencyConnectionRepository;
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final FileStorage fileStorage;
 
     @Transactional
@@ -104,6 +106,9 @@ public class UserDataEraser {
         List<ChatSession> sessions = chatSessionRepository.findByUserIdOrderByCreatedAtDesc(userId);
         sessions.forEach(session -> chatMessageRepository.deleteByChatSessionId(session.getId()));
         chatSessionRepository.deleteAll(sessions);
+
+        // 로그인 세션 기록에도 user_id가 남아 있으므로 함께 지운다.
+        refreshTokenRepository.deleteByUserId(userId);
 
         TransactionUtils.runAfterCommit(() -> files.forEach(this::deleteQuietly));
     }

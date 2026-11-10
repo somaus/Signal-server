@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 
 class DeepfakeDetectionResponseTest {
 
+    private static final com.signal.global.file.FileUrlSigner SIGNER = new com.signal.global.file.FileUrlSigner("s", 3600);
+
     private DeepfakeDetection newDetection() {
         return DeepfakeDetection.builder().userId(1L).fileUrl("/uploads/a.png").build();
     }
@@ -25,7 +27,7 @@ class DeepfakeDetectionResponseTest {
                 List.of(), "/uploads/h.png", "cf", "onnx-fp32+abc",
                 List.of(ProvenanceSignal.GENERATOR_METADATA, ProvenanceSignal.C2PA_MANIFEST));
 
-        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection, null, true);
+        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection, null, true, SIGNER);
 
         assertThat(response.band()).isEqualTo("HIGH");
         assertThat(response.assessmentBasis()).isEqualTo("PROVENANCE");
@@ -46,7 +48,7 @@ class DeepfakeDetectionResponseTest {
         detection.completeAssessed(DetectionBand.UNDETERMINED, AssessmentBasis.MODEL, UndeterminedReason.LOW_RESOLUTION,
                 null, null, null, List.of(), "/uploads/h.png", "cf", "v", List.of());
 
-        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection, null, true);
+        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection, null, true, SIGNER);
 
         assertThat(response.band()).isEqualTo("UNDETERMINED");
         assertThat(response.undeterminedReason()).isEqualTo("LOW_RESOLUTION");
@@ -59,7 +61,7 @@ class DeepfakeDetectionResponseTest {
         DeepfakeDetection detection = newDetection();
         detection.complete(Verdict.SUSPICIOUS, 0.6, 55, List.of(), "/uploads/h.png", false);
 
-        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection, null, true);
+        DeepfakeDetectionResponse response = DeepfakeDetectionResponse.from(detection, null, true, SIGNER);
 
         assertThat(response.band()).isNull();
         assertThat(response.modelName()).isNull();
@@ -71,7 +73,7 @@ class DeepfakeDetectionResponseTest {
     void 웹_검색_사용_가능_여부를_함께_내려준다() {
         DeepfakeDetection detection = DeepfakeDetection.builder().fileUrl("/uploads/a.png").build();
 
-        assertThat(DeepfakeDetectionResponse.from(detection, null, true).webSearchAvailable()).isTrue();
-        assertThat(DeepfakeDetectionResponse.from(detection, null, false).webSearchAvailable()).isFalse();
+        assertThat(DeepfakeDetectionResponse.from(detection, null, true, SIGNER).webSearchAvailable()).isTrue();
+        assertThat(DeepfakeDetectionResponse.from(detection, null, false, SIGNER).webSearchAvailable()).isFalse();
     }
 }

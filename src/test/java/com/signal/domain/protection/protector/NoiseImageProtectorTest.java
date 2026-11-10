@@ -70,7 +70,7 @@ class NoiseImageProtectorTest {
         byte[] original = solidPng(0x808080);
         when(protectionRepository.findById(1L)).thenReturn(Optional.of(protection));
         when(fileStorage.load("/uploads/risk-assessments/original.png")).thenReturn(original);
-        when(fileStorage.store(any(byte[].class), eq("protected.png"), eq("protections")))
+        when(fileStorage.store(any(byte[].class), eq("protections")))
                 .thenReturn("/uploads/protections/generated.png");
 
         protector.protect(1L, "/uploads/risk-assessments/original.png", ProtectionLevel.NORMAL);
@@ -80,7 +80,7 @@ class NoiseImageProtectorTest {
         assertThat(protection.getVisualDifference()).isPositive().isLessThan(0.1);
 
         ArgumentCaptor<byte[]> stored = ArgumentCaptor.forClass(byte[].class);
-        verify(fileStorage).store(stored.capture(), anyString(), anyString());
+        verify(fileStorage).store(stored.capture(), anyString());
         assertThat(stored.getValue()).isNotEqualTo(original);
 
         BufferedImage result = ImageIO.read(new ByteArrayInputStream(stored.getValue()));
@@ -115,7 +115,7 @@ class NoiseImageProtectorTest {
 
         assertThat(protection.getStatus()).isEqualTo(ProtectionStatus.FAILED);
         verify(protectionRepository).save(protection);
-        verify(fileStorage, never()).store(any(byte[].class), anyString(), anyString());
+        verify(fileStorage, never()).store(any(byte[].class), anyString());
     }
 
     @Test

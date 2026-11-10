@@ -40,6 +40,15 @@ class DeepfakeDetectionControllerWebSearchTest {
     private MockMvc mockMvc;
 
     @MockitoBean
+    private com.signal.global.file.FileUrlSigner fileUrlSigner;
+
+    @org.junit.jupiter.api.BeforeEach
+    void signUrls() {
+        when(fileUrlSigner.sign(org.mockito.ArgumentMatchers.anyString()))
+                .thenAnswer(i -> i.getArgument(0, String.class) + "?exp=1&sig=s");
+    }
+
+    @MockitoBean
     private DeepfakeDetectionService deepfakeDetectionService;
 
     @MockitoBean
@@ -50,6 +59,9 @@ class DeepfakeDetectionControllerWebSearchTest {
 
     @MockitoBean
     private UserRepository userRepository;
+
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
 
     @Test
     void 웹_검색이_꺼져_있으면_404_WEB_SEARCH_DISABLED다() throws Exception {

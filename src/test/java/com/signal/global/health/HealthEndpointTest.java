@@ -25,6 +25,9 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(properties = "cors.allowed-origins=http://localhost:3000")
 class HealthEndpointTest {
 
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.signal.global.file.FileUrlSigner fileUrlSigner;
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -33,6 +36,9 @@ class HealthEndpointTest {
 
     @MockitoBean
     private UserRepository userRepository;
+
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
 
     @Test
     void 헬스체크는_인증_없이_200_OK를_반환한다() throws Exception {

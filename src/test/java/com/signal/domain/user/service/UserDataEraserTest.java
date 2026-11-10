@@ -13,6 +13,7 @@ import static org.mockito.Mockito.when;
 import com.signal.domain.agency.entity.AgencyConnection;
 import com.signal.domain.agency.entity.ConnectionType;
 import com.signal.domain.agency.repository.AgencyConnectionRepository;
+import com.signal.domain.auth.repository.RefreshTokenRepository;
 import com.signal.domain.chat.entity.ChatSession;
 import com.signal.domain.chat.repository.ChatMessageRepository;
 import com.signal.domain.chat.repository.ChatSessionRepository;
@@ -65,6 +66,8 @@ class UserDataEraserTest {
     @Mock
     private ChatMessageRepository chatMessageRepository;
     @Mock
+    private RefreshTokenRepository refreshTokenRepository;
+    @Mock
     private FileStorage fileStorage;
 
     private UserDataEraser eraser;
@@ -82,7 +85,7 @@ class UserDataEraserTest {
     void setUp() {
         eraser = new UserDataEraser(riskAssessmentRepository, deepfakeDetectionRepository, protectionRepository,
                 monitoringRepository, detectionRepository, reportRepository, reportEvidenceRepository,
-                agencyConnectionRepository, chatSessionRepository, chatMessageRepository, fileStorage);
+                agencyConnectionRepository, chatSessionRepository, chatMessageRepository, refreshTokenRepository, fileStorage);
 
         assessment = RiskAssessment.builder().userId(USER_ID).imageUrl("/uploads/risk-assessments/a.png")
                 .faceDetected(true).factors(List.of()).recommendations(List.of()).faces(List.of()).build();
@@ -121,6 +124,7 @@ class UserDataEraserTest {
         verify(protectionRepository).deleteAll(List.of(protection));
         verify(detectionRepository).deleteAllByMonitoringId(9L);
         verify(monitoringRepository).deleteAll(List.of(monitoring));
+        verify(refreshTokenRepository).deleteByUserId(USER_ID);
         verify(reportRepository).deleteAll(List.of(report));
         verify(reportEvidenceRepository).deleteAll(List.of(evidence));
         verify(agencyConnectionRepository).deleteAll(List.of(connection));

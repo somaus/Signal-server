@@ -1,6 +1,7 @@
 package com.signal.domain.auth.controller;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -26,12 +27,15 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-/** /reissue는 refreshToken이 없거나 비어 있어도 500이 아니라 INVALID_REFRESH_TOKEN(401)으로 응답해야 한다. */
+/** /reissue는 refreshToken이 없거나 비어 있으면 500이 아니라 INVALID_INPUT(400)으로 응답해야 한다. */
 @WebMvcTest(AuthController.class)
 @Import({SecurityConfig.class, JwtAuthenticationFilter.class, JwtAuthenticationEntryPoint.class,
         JwtAccessDeniedHandler.class, GlobalExceptionHandler.class})
 @TestPropertySource(properties = "cors.allowed-origins=http://localhost:3000")
 class AuthControllerReissueTest {
+
+    @org.springframework.test.context.bean.override.mockito.MockitoBean
+    private com.signal.global.file.FileUrlSigner fileUrlSigner;
 
     @Autowired
     private MockMvc mockMvc;
@@ -48,25 +52,32 @@ class AuthControllerReissueTest {
     @MockitoBean
     private UserRepository userRepository;
 
-    private void givenReissueRejects() {
-        when(authService.reissue(any())).thenThrow(new SignalException(ErrorCode.INVALID_REFRESH_TOKEN));
-    }
+    @MockitoBean
+    private com.signal.domain.auth.repository.RefreshTokenRepository refreshTokenRepository;
 
     @Test
-    void refreshToken_없이_요청하면_401_INVALID_REFRESH_TOKEN이다() throws Exception {
-        givenReissueRejects();
-
+    void refreshToken_없이_요청하면_400_INVALID_INPUT이다() throws Exception {
         mockMvc.perform(patch("/api/v1/auth/reissue").contentType(MediaType.APPLICATION_JSON).content("{}"))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        verifyNoInteractions(authService);
     }
 
     @Test
-    void refreshToken이_빈_문자열이면_401_INVALID_REFRESH_TOKEN이다() throws Exception {
-        givenReissueRejects();
-
+    void refreshToken이_빈_문자열이면_400_INVALID_INPUT이다() throws Exception {
         mockMvc.perform(patch("/api/v1/auth/reissue").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"refreshToken\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+        verifyNoInteractions(authService);
+    }
+
+    @Test
+    void 재발급이_거부되면_401_INVALID_REFRESH_TOKEN이다() throws Exception {
+        when(authService.reissue(any())).thenThrow(new SignalException(ErrorCode.INVALID_REFRESH_TOKEN));
+
+        mockMvc.perform(patch("/api/v1/auth/reissue").contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"refreshToken\":\"x\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("INVALID_REFRESH_TOKEN"));
     }

@@ -1,5 +1,6 @@
 package com.signal.domain.monitoring.service;
 
+import com.signal.global.file.TestFileBytes;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -28,6 +29,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.web.multipart.MultipartFile;
 
 @ExtendWith(MockitoExtension.class)
 class MonitoringServiceTest {
@@ -53,8 +55,8 @@ class MonitoringServiceTest {
 
     @Test
     void 모니터링을_생성하면_ACTIVE_상태로_저장되고_탐지가_시작된다() {
-        MockMultipartFile image = new MockMultipartFile("referenceImage", "face.png", "image/png", new byte[]{1, 2, 3});
-        when(fileStorage.store(any(), anyString())).thenReturn("/uploads/monitorings/generated.png");
+        MockMultipartFile image = new MockMultipartFile("referenceImage", "face.png", "image/png", TestFileBytes.PNG);
+        when(fileStorage.store(any(MultipartFile.class), anyString())).thenReturn("/uploads/monitorings/generated.png");
         when(monitoringRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         Monitoring monitoring = monitoringService.createMonitoring(1L, image);
@@ -143,7 +145,7 @@ class MonitoringServiceTest {
     @Test
     void 사용자당_모니터링_수를_넘으면_예외가_발생한다() {
         when(monitoringRepository.countByUserId(1L)).thenReturn(3L);
-        MockMultipartFile file = new MockMultipartFile("referenceImage", "a.png", "image/png", new byte[]{1});
+        MockMultipartFile file = new MockMultipartFile("referenceImage", "a.png", "image/png", TestFileBytes.PNG);
 
         assertThatThrownBy(() -> monitoringService.createMonitoring(1L, file))
                 .isInstanceOf(SignalException.class)

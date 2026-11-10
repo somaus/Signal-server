@@ -6,6 +6,7 @@ import com.signal.domain.user.repository.UserRepository;
 import com.signal.global.exception.ErrorCode;
 import com.signal.global.exception.SignalException;
 import com.signal.global.file.FileStorage;
+import com.signal.global.file.UploadFileValidator;
 import com.signal.global.util.TransactionUtils;
 import com.signal.domain.websearch.service.WebSearchService;
 import java.util.Set;
@@ -71,14 +72,6 @@ public class UserService {
     }
 
     private void validateImage(MultipartFile image) {
-        if (image == null || image.isEmpty()) {
-            throw new SignalException(ErrorCode.INVALID_INPUT);
-        }
-        if (image.getSize() > MAX_PROFILE_IMAGE_SIZE) {
-            throw new SignalException(ErrorCode.FILE_TOO_LARGE);
-        }
-        if (!ALLOWED_CONTENT_TYPES.contains(image.getContentType())) {
-            throw new SignalException(ErrorCode.UNSUPPORTED_MEDIA_TYPE);
-        }
+        UploadFileValidator.validate(image, MAX_PROFILE_IMAGE_SIZE, ALLOWED_CONTENT_TYPES);
     }
 }

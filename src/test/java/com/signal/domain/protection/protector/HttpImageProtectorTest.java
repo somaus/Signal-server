@@ -65,7 +65,7 @@ class HttpImageProtectorTest {
         Protection protection = sampleProtection();
         when(protectionRepository.findById(1L)).thenReturn(Optional.of(protection));
         when(fileStorage.load(ORIGINAL_URL)).thenReturn(new byte[]{1, 2, 3});
-        when(fileStorage.store(any(byte[].class), eq("protected.png"), eq("protections")))
+        when(fileStorage.store(any(byte[].class), eq("protections")))
                 .thenReturn("/uploads/protections/generated.png");
         server.expect(requestTo("http://protection-lab:8000/protect"))
                 .andExpect(method(HttpMethod.POST))
@@ -92,7 +92,7 @@ class HttpImageProtectorTest {
 
         assertThat(protection.getStatus()).isEqualTo(ProtectionStatus.FAILED);
         assertThat(protection.getProtectedImageUrl()).isNull();
-        verify(fileStorage, never()).store(any(byte[].class), anyString(), anyString());
+        verify(fileStorage, never()).store(any(byte[].class), anyString());
         verify(protectionRepository).save(protection);
     }
 

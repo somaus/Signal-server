@@ -2,6 +2,7 @@ package com.signal.domain.protection.dto.response;
 
 import com.signal.domain.protection.entity.Protection;
 import com.signal.domain.protection.entity.ProtectionStatus;
+import com.signal.global.file.FileUrlSigner;
 
 /**
  * visualDifference는 원본 대비 보호 이미지의 RMS 픽셀 차이(0~1, 실측값)이며 처리 완료 전에는 null이다.
@@ -16,12 +17,12 @@ public record ProtectionResponse(
         boolean simulated
 ) {
 
-    public static ProtectionResponse from(Protection protection) {
+    public static ProtectionResponse from(Protection protection, FileUrlSigner signer) {
         return new ProtectionResponse(
                 protection.getId(),
                 protection.getStatus(),
-                protection.getOriginalImageUrl(),
-                protection.getProtectedImageUrl(),
+                signer.sign(protection.getOriginalImageUrl()),
+                signer.sign(protection.getProtectedImageUrl()),
                 protection.getVisualDifference(),
                 false);
     }

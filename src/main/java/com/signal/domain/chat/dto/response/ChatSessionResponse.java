@@ -11,7 +11,8 @@ public record ChatSessionResponse(
         SituationType lastSituationType,
         boolean lastCrisisDetected,
         LocalDateTime createdAt,
-        LocalDateTime updatedAt
+        LocalDateTime updatedAt,
+        boolean sessionEnded
 ) {
 
     public static ChatSessionResponse from(ChatSession session) {
@@ -22,6 +23,7 @@ public record ChatSessionResponse(
                 session.getLastSituationType(),
                 session.isLastCrisisDetected(),
                 session.getCreatedAt(),
-                session.getUpdatedAt());
+                session.getUpdatedAt(),
+                session.isSessionEnded());
     }
 }

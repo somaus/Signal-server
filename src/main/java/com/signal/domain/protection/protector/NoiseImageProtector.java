@@ -60,7 +60,7 @@ public class NoiseImageProtector implements ImageProtector {
             BufferedImage original = ImageOrientation.apply(readImage(originalBytes), readOrientation(originalBytes));
 
             ProtectedImage result = addNoise(original, amplitude(protectionLevel));
-            String protectedImageUrl = fileStorage.store(result.png(), "protected.png", PROTECTED_IMAGE_DIRECTORY);
+            String protectedImageUrl = fileStorage.store(result.png(), PROTECTED_IMAGE_DIRECTORY);
 
             markCompleted(protectionId, protectedImageUrl, result.visualDifference());
         } catch (Exception e) {

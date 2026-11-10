@@ -17,6 +17,8 @@ CROP = 384
 MEAN = np.array([0.48145466, 0.4578275, 0.40821073], dtype=np.float32)
 STD = np.array([0.26862954, 0.26130258, 0.27577711], dtype=np.float32)
 MAX_PIXELS = 64_000_000  # 압축 폭탄 방지. 휴대폰 48~50MP 사진은 받고, 디코딩 메모리(RGB 3바이트/픽셀)는 동시 처리 수로 묶는다
+# 리사이즈 결과의 한도. 모델은 가운데 384x384만 쓰므로 원본 한도보다 훨씬 작게 둔다(16MP면 RGB 약 48MB, 가로세로 약 80:1 비율까지).
+MAX_RESIZED_PIXELS = 16_000_000
 
 
 class InvalidImage(ValueError):
@@ -27,7 +29,7 @@ class ImageTooLarge(ValueError):
     """픽셀 수가 한도를 넘는다."""
 
 
-def load_image(data: bytes, max_pixels: int = MAX_PIXELS) -> Image.Image:
+def load_image(data: bytes, max_pixels: int = MAX_PIXELS, max_resized_pixels: int = MAX_RESIZED_PIXELS) -> Image.Image:
     try:
         img = Image.open(io.BytesIO(data))
         width, height = img.size
@@ -35,6 +37,10 @@ def load_image(data: bytes, max_pixels: int = MAX_PIXELS) -> Image.Image:
         raise InvalidImage("이미지를 읽을 수 없습니다") from e
     if width * height > max_pixels:
         raise ImageTooLarge(f"이미지가 너무 큽니다({width}x{height})")
+    resized_w, resized_h = target_size(width, height)
+    if resized_w * resized_h > max_resized_pixels:
+        # 아주 가는 이미지는 짧은 변을 440으로 늘리면 긴 변이 폭증해(1x50000 -> 440x22M) 메모리가 터진다.
+        raise ImageTooLarge(f"이미지 비율이 너무 극단적입니다({width}x{height})")
     try:
         img.load()
         return img if img.mode == "RGB" else img.convert("RGB")  # convert는 같은 모드여도 복사하므로 거른다

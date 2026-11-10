@@ -14,6 +14,8 @@ public final class RiskTexts {
     public static final String FACE_EXPOSURE = "FACE_EXPOSURE";
     public static final String METADATA_LEAK = "METADATA_LEAK";
     public static final String REVERSE_SEARCH_RISK = "REVERSE_SEARCH_RISK";
+    /** 사용자가 동의해 실제 웹 역검색을 한 결과 항목. 추정 항목(REVERSE_SEARCH_RISK)을 대신한다. */
+    public static final String REVERSE_SEARCH_RESULT = "REVERSE_SEARCH_RESULT";
 
     private RiskTexts() {
     }
@@ -27,10 +29,25 @@ public final class RiskTexts {
             case IMAGE_QUALITY -> pick(language, "이미지 품질", "Image quality", "画像品質", "图像质量");
             case FACE_EXPOSURE -> pick(language, "얼굴 노출도", "Face exposure", "顔の露出度", "面部暴露程度");
             case METADATA_LEAK -> pick(language, "메타데이터 노출", "Metadata exposure", "メタデータの露出", "元数据泄露");
-            case REVERSE_SEARCH_RISK -> pick(language, "역검색 노출 위험", "Reverse-search exposure risk",
-                    "逆画像検索による特定リスク", "反向图片搜索暴露风险");
+            case REVERSE_SEARCH_RISK -> pick(language, "노출 가능성(추정)", "Exposure likelihood (estimate)",
+                    "露出の可能性（推定）", "暴露可能性（估算）");
+            case REVERSE_SEARCH_RESULT -> pick(language, "웹 역검색 결과", "Web reverse-search result",
+                    "Web逆画像検索の結果", "网络反向搜索结果");
             default -> fallback;
         };
+    }
+
+    /** 실제 웹 역검색에서 찾은 페이지 수를 설명하는 문구(#55). */
+    public static String reverseSearchResultDescription(int same, int similar, int score, ResponseLanguage language) {
+        return pick(language,
+                "웹에서 같은 이미지가 올라온 페이지 " + same + "건, 비슷한 이미지나 같은 페이지 노출 " + similar
+                        + "건을 찾았습니다. 찾은 페이지가 모두 도용은 아닙니다. (점수: " + score + ")",
+                "Found " + same + " web page(s) with the same image and " + similar
+                        + " with a similar image or the same page. Not every page found is misuse. (score: " + score + ")",
+                "同じ画像が掲載されたWebページが" + same + "件、似た画像または同じページへの掲載が" + similar
+                        + "件見つかりました。見つかったページがすべて盗用とは限りません。（スコア：" + score + "）",
+                "找到刊登相同图片的网页" + same + "个，相似图片或同一网页出现" + similar
+                        + "个。找到的网页不一定都是盗用。（分数：" + score + "）");
     }
 
     public static String metadataDescription(boolean hasGps, ResponseLanguage language) {
@@ -71,6 +88,15 @@ public final class RiskTexts {
                         + "% of the image and is " + frontal + "% frontal.",
                 "顔を" + faceCount + "件検出しました。最も露出している顔は画面の" + area + "%を占め、正面度は" + frontal + "%です。",
                 "检测到" + faceCount + "张面部，暴露最多的面部占画面的" + area + "%，正面度为" + frontal + "%。");
+    }
+
+    /** 역검색 항목이 실제 검색 결과가 아닌 추정치임을 알리는 문구(#55). 항목 설명 앞에 붙는다. */
+    public static String reverseSearchDisclaimer(ResponseLanguage language) {
+        return pick(language,
+                "실제 역이미지 검색 결과가 아니라 AI가 이미지 특징으로 짐작한 추정치입니다.",
+                "This is an AI estimate based on the image's features, not the result of an actual reverse image search.",
+                "実際の逆画像検索の結果ではなく、AIが画像の特徴から推測した推定値です。",
+                "这不是实际反向图片搜索的结果，而是AI根据图片特征做出的估算。");
     }
 
     public static String defaultNote(ResponseLanguage language) {

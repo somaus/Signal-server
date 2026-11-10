@@ -5,6 +5,7 @@ import com.signal.domain.protection.dto.response.ProtectionCreateResponse;
 import com.signal.domain.protection.dto.response.ProtectionResponse;
 import com.signal.domain.protection.entity.Protection;
 import com.signal.domain.protection.service.ProtectionService;
+import com.signal.global.file.FileUrlSigner;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProtectionController {
 
     private final ProtectionService protectionService;
+    private final FileUrlSigner fileUrlSigner;
 
     @Operation(summary = "이미지 보호 처리 요청",
             description = "원본 이미지에 노이즈를 삽입해 보호 이미지를 비동기로 생성합니다. 학습 모델을 겨냥한 적대적 섭동이 아닌 일반 노이즈 삽입이라 도용·합성 방지를 보장하지는 않습니다.")
@@ -44,7 +46,7 @@ public class ProtectionController {
             @AuthenticationPrincipal Long userId,
             @PathVariable Long protectionId) {
         Protection protection = protectionService.getProtection(userId, protectionId);
-        return ResponseEntity.ok(ProtectionResponse.from(protection));
+        return ResponseEntity.ok(ProtectionResponse.from(protection, fileUrlSigner));
     }
 
     @Operation(summary = "보호 이미지 다운로드",
