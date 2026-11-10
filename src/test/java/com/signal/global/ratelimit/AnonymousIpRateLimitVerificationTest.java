@@ -10,6 +10,7 @@ import com.signal.domain.auth.service.VerificationService;
 import com.signal.domain.user.repository.UserRepository;
 import com.signal.global.config.SecurityConfig;
 import com.signal.global.exception.GlobalExceptionHandler;
+import com.signal.global.file.FileUrlSigner;
 import com.signal.global.security.JwtAccessDeniedHandler;
 import com.signal.global.security.JwtAuthenticationEntryPoint;
 import com.signal.global.security.jwt.JwtAuthenticationFilter;
@@ -46,6 +47,9 @@ class AnonymousIpRateLimitVerificationTest {
 
     @MockitoBean
     private UserRepository userRepository;
+
+    @MockitoBean
+    private FileUrlSigner fileUrlSigner;
 
     private void sendCode(String email, int expected) throws Exception {
         var result = mockMvc.perform(post("/api/v1/auth/verification/send")
