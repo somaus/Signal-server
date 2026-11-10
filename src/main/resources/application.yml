@@ -165,3 +165,6 @@ spring:
     defer-datasource-initialization: false   # true면 Flyway와 entityManagerFactory가 순환 의존해 기동 실패. 운영 DB는 테이블이 이미 있어 data.sql을 먼저 실행해도 안전
     hibernate:
       ddl-auto: validate
+
+file:
+  url-signing-secret: ${FILE_URL_SIGNING_SECRET}   # 운영은 기본값 없이 두어 dev 키로 서명이 위조되지 않게 한다(없으면 기동 실패)
