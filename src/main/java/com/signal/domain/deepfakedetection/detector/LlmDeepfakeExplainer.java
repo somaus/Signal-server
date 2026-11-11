@@ -44,7 +44,8 @@ public class LlmDeepfakeExplainer implements DeepfakeExplainer {
 
             {
               "observations": [
-                {"description": "한국어 한 문장",
+                {"title": "근거의 핵심을 2~4단어 명사구로 요약 (예: 부자연스러운 피부 질감, 배경 경계 번짐)",
+                 "description": "한국어 한 문장",
                  "region": {"x":0-1,"y":0-1,"width":0-1,"height":0-1} 형태의 정규화 좌표, 특정 부위를 지목할 수 없으면 null}
               ]
             }
@@ -96,13 +97,22 @@ public class LlmDeepfakeExplainer implements DeepfakeExplainer {
                 continue;
             }
             evidences.add(Evidence.builder()
-                    .type("OTHER")
+                    .type(toTitle(observation.title()))
                     .description(description)
                     .region(toRegion(observation.region(), width, height))
                     .frame(null)
                     .build());
         }
         return evidences;
+    }
+
+    /** 탭 이름으로 쓰는 짧은 요약. 없거나 너무 길면 OTHER(프론트가 기본 이름을 붙인다). */
+    static String toTitle(String title) {
+        if (title == null || title.isBlank()) {
+            return "OTHER";
+        }
+        String trimmed = title.trim();
+        return trimmed.length() > 20 || isAssertive(trimmed) ? "OTHER" : trimmed;
     }
 
     static boolean isAssertive(String description) {
@@ -133,7 +143,7 @@ public class LlmDeepfakeExplainer implements DeepfakeExplainer {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    private record Observation(String description, NormalizedRegion region) {
+    private record Observation(String title, String description, NormalizedRegion region) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
