@@ -33,6 +33,7 @@ services:
       PROTECTION_MODE: ${PROTECTION_MODE:-noise}          # http로 바꾸면 protection 서비스(노이즈 삽입)를 호출
       PROTECTION_API_URL: http://protection:8000
       DEEPFAKE_DETECTION_MODE: ${DEEPFAKE_DETECTION_MODE:-llm}   # http로 바꾸면 detect 서비스(전용 탐지 모델)를 호출
+      DEEPFAKE_EXPLAIN_ENABLED: ${DEEPFAKE_EXPLAIN_ENABLED:-true}   # 탐지 등급에 비전 LLM 설명(근거 탭)을 붙인다. 등급은 바꾸지 못함
       DEEPFAKE_DETECTION_API_URL: http://detect:8000
       RISK_ANALYSIS_MODE: ${RISK_ANALYSIS_MODE:-llm}   # http로 바꾸면 risk 서비스(얼굴 검출·측정)로 위험도를 계산
       RISK_ANALYSIS_API_URL: http://risk:8000
