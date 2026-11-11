@@ -120,9 +120,9 @@ jobs:
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           APP_IMAGE: ${{ env.IMAGE }}:${{ github.sha }}
           DETECT_IMAGE: ${{ env.DETECT_IMAGE }}:${{ github.sha }}
-          # 탐지 방식. 저장소 변수 DEEPFAKE_DETECTION_MODE(Settings > Variables > Actions)가 있으면 그 값을 쓰고, 없으면 llm.
+          # 탐지 방식. 저장소 변수 DEEPFAKE_DETECTION_MODE(Settings > Variables > Actions)가 있으면 그 값을 쓰고, 없으면 http(전용 탐지 모델). 비전 LLM은 점수가 중간값(~45)에 몰려 기본에서 뺐다.
           # 평가(#33, #35)로 기준선을 넘는 걸 확인한 뒤 변수를 http로 만들어 켠다. llm이면 detect를 띄우지 않고 기존 비전 LLM 탐지로 배포한다.
-          DETECTION_MODE: ${{ vars.DEEPFAKE_DETECTION_MODE || 'llm' }}
+          DETECTION_MODE: ${{ vars.DEEPFAKE_DETECTION_MODE || 'http' }}
           DEPLOY_SHA: ${{ github.sha }}
           FILE_URL_SIGNING_SECRET: ${{ secrets.FILE_URL_SIGNING_SECRET }}
           RUN_SCHEMA_UPDATE: ${{ inputs.run_schema_update || false }}
@@ -157,5 +157,5 @@ jobs:
             echo "- 이미지: \`${{ env.IMAGE }}:${{ github.sha }}\`"
             echo "- 공개 URL: https://signal.https.gsmsv.site"
             echo "- 스키마 반영: \`${{ inputs.run_schema_update || false }}\`"
-            echo "- 탐지 방식 요청값: \`${{ vars.DEEPFAKE_DETECTION_MODE || 'llm' }}\` (http를 요청했는데 탐지 서비스가 준비되지 않으면 서버가 llm으로 배포하며, 이때 실행 요약에 경고가 남는다)"
+            echo "- 탐지 방식 요청값: \`${{ vars.DEEPFAKE_DETECTION_MODE || 'http' }}\` (http를 요청했는데 탐지 서비스가 준비되지 않으면 서버가 llm으로 배포하며, 이때 실행 요약에 경고가 남는다)"
           } >> "$GITHUB_STEP_SUMMARY"
