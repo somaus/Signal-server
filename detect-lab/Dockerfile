@@ -3,7 +3,9 @@
 FROM python:3.11-slim
 LABEL org.opencontainers.image.source="https://github.com/somaus/Signal-server"
 WORKDIR /srv
-ENV DETECT_MODEL_DIR=/models DETECT_MODEL_PATH=/models/onnx/model.onnx HF_HOME=/models/.hf PYTHONUNBUFFERED=1
+# 운영 서버에서 xet(cas-server.xethub.hf.co) 연결이 시간 초과되어 일반 HTTP로 받는다.
+ENV DETECT_MODEL_DIR=/models DETECT_MODEL_PATH=/models/onnx/model.onnx HF_HOME=/models/.hf PYTHONUNBUFFERED=1 \
+    HF_HUB_DISABLE_XET=1
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY preprocess.py model.py fetch_model.py app.py ./
